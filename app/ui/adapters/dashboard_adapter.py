@@ -54,7 +54,7 @@ class DashboardAdapter:
             bilan = calculer(conn, exercice.id)
 
             # Détails des dettes
-            debtors = self._get_debtors(conn, exercice.id)
+            debtors = self._get_debtors(conn, exercice_id)
 
             # Alertes
             alerts = self._get_alerts(exercice, bilan)
@@ -76,7 +76,7 @@ class DashboardAdapter:
                 deceased_members=deceased_count,
                 rubriques=rubriques,
                 expenses=expenses,
-                debts_total=bilan.dettes_total,
+                debts_total=bilan.total_dettes,
                 debtor_members=len(debtors),
                 payments=(),  # À implémenter avec versements récents
                 alerts=alerts,
@@ -168,25 +168,24 @@ class DashboardAdapter:
     def _get_reliquats_total(self, conn: sqlite3.Connection, exercice_id: int) -> int:
         """Calcule le total des reliquats."""
         try:
-            reliquats = depenses.reliquats.list_for_exercice(conn, exercice_id)
-            return sum(r["montant"] for r in reliquats)
+            from app.repositories import reliquats
+            return reliquats.total(conn, exercice_id)
         except Exception:
             return 0
 
     def _get_debtors(self, conn: sqlite3.Connection, exercice_id: int) -> tuple[DebtorInfo, ...]:
         """Récupère la liste des membres avec des dettes."""
         try:
-            tableau = tableau_mensuel(conn, exercice_id)
+            page = tableau_mensuel(conn, exercice_id)
             debtors = []
-            for m in tableau:
-                if m.dette > 0:
-                    membre = membres.get(conn, m.membre_id)
-                    if membre:
-                        debtors.append(DebtorInfo(
-                            membre.nom,
-                            f"Carnet {membre.numero_carnet}",
-                            m.dette
-                        ))
+            for ligne in page.lignes:
+                if ligne.releve.total_debt > 0:
+                    membre = ligne.membre
+                    debtors.append(DebtorInfo(
+                        membre.nom,
+                        f"Carnet {membre.numero_carnet}",
+                        ligne.releve.total_debt
+                    ))
             return tuple(debtors)
         except Exception:
             return ()
@@ -205,7 +204,7 @@ class DashboardAdapter:
                     f"L'exercice {exercice.libelle} se termine dans {days_left} jours."
                 ))
 
-        if bilan.dettes_total > 0:
+        if bilan.total_dettes > 0:
             alerts.append(AlertInfo(
                 "danger",
                 f"{bilan.nb_debiteurs} membres ont des dettes de cotisation à recouvrer."
@@ -216,21 +215,26 @@ class DashboardAdapter:
     def _get_monthly_figures(self, conn: sqlite3.Connection, exercice_id: int,
                            start: date, end: date) -> tuple[MonthFigures, ...]:
         """Calcule les entrées et dépenses par mois."""
-        months = exercise_months(start, end)
+        # exercise_months prend un start_year, pas des dates
+        # On utilise l'année de début de l'exercice
+        from app.services.calendrier import start_year_for_date
+        start_year = start_year_for_date(start)
+        months = exercise_months(start_year)
         figures = []
-        
-        for month_info in months:
+
+        for year, month in months:
             # Entrées du mois
             entrees = 0  # À implémenter avec versements du mois
             # Dépenses du mois
             depenses = 0  # À implémenter avec dépenses du mois
-            
+
+            from app.services.calendrier import month_label
             figures.append(MonthFigures(
-                month_info.label,
+                month_label(month),
                 entrees,
                 depenses
             ))
-        
+
         return tuple(figures)
 
     def _get_recent_operations(self, conn: sqlite3.Connection, exercice_id: int) -> tuple[OperationInfo, ...]:

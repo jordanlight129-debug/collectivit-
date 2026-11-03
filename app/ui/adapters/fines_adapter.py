@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 
 from app.database.connection import get_connection
-from app.repositories import exercices, amendes
+from app.repositories import exercices, amendes, membres
 from app.ui.ports_fines import FinesData, FineRecord
 
 
@@ -28,7 +28,7 @@ class FinesAdapter:
             is_open = exercice.statut == "ouvert"
 
             # Récupérer les amendes
-            fines = amendes.list_for_exercice(conn, exercice_id)
+            fines = amendes.list_(conn, exercice_id)
 
             # Convertir en FineRecord
             records = []

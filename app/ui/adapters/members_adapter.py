@@ -7,6 +7,8 @@ from datetime import date
 from app.database.connection import get_connection
 from app.repositories import membres, exercices
 from app.services.tableau_mensuel import tableau as tableau_mensuel
+from app.services.membre_service import create_membre
+from app.security.session import Session, CurrentUser, Role
 from app.ui.ports_members import MemberInfo, MembersData, MemberStatus
 
 
@@ -46,11 +48,11 @@ class MembersAdapter:
                 if is_open:
                     # Utiliser le tableau mensuel pour calculer
                     try:
-                        tableau = tableau_mensuel(conn, exercice_id)
-                        for ligne in tableau:
-                            if ligne.membre_id == m.id:
-                                du = ligne.du
-                                recu = ligne.perçu
+                        page = tableau_mensuel(conn, exercice_id)
+                        for ligne in page.lignes:
+                            if ligne.membre.id == m.id:
+                                du = ligne.releve.total_due
+                                recu = ligne.releve.total_paid
                                 break
                     except Exception:
                         pass
@@ -73,3 +75,26 @@ class MembersAdapter:
             import traceback
             traceback.print_exc()
             return MembersData(exercise_label, True, ())
+
+    def add_member(self, nom: str, sexe: str, date_adhesion: str) -> int:
+        """Ajoute un nouveau membre."""
+        from app.models.sexe import Sexe
+        conn = get_connection()
+        try:
+            # Créer une session temporaire pour l'ajout
+            session = Session()
+            session.login(CurrentUser(1, "admin", "Administrateur", Role.ADMINISTRATEUR))
+
+            # Convertir la date
+            adhesion_date = date.fromisoformat(date_adhesion)
+            sexe_enum = Sexe.HOMME if sexe == "M" else Sexe.FEMME
+
+            # Créer le membre
+            membre_id = create_membre(conn, session, nom, sexe_enum, adhesion_date)
+
+            conn.commit()
+            conn.close()
+            return membre_id
+        except Exception as e:
+            conn.close()
+            raise Exception(f"Erreur lors de l'ajout du membre: {e}")

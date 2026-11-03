@@ -1,6 +1,8 @@
 """Adaptateur des rapports : connecte ReportsPort aux services."""
 from __future__ import annotations
 
+from app.database.connection import get_connection
+from app.repositories import exercices
 from app.ui.ports_reports import ReportsData
 
 
@@ -11,10 +13,23 @@ class ReportsAdapter:
         pass
 
     def load(self, exercise_label: str) -> ReportsData:
-        # Pour l'instant, retourne des données vides
-        # À implémenter avec les services de génération de rapports
-        return ReportsData(
-            exercise_label=exercise_label,
-            can_export_excel=False,
-            can_export_pdf=False,
-        )
+        # À implémenter plus tard avec les services de génération de rapports
+        conn = get_connection()
+        try:
+            exercice = exercices.get_by_libelle(conn, exercise_label)
+            if not exercice:
+                return self._empty_data(exercise_label)
+            return ReportsData(
+                exercise_label=exercise_label,
+                is_open=exercice.statut == "ouvert",
+            )
+        except Exception as e:
+            print(f"Erreur reports adapter: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._empty_data(exercise_label)
+        finally:
+            conn.close()
+
+    def _empty_data(self, exercise_label: str) -> ReportsData:
+        return ReportsData(exercise_label=exercise_label, is_open=True)

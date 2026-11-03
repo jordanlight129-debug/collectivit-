@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 
 from app.database.connection import get_connection
-from app.repositories import exercices, reliquats
+from app.repositories import exercices, reliquats, depenses
 from app.ui.ports_leftovers import LeftoversData, LeftoverRecord
 
 

@@ -21,7 +21,11 @@ from app.ui.adapters.expenses_adapter import ExpensesAdapter
 from app.ui.adapters.leftovers_adapter import LeftoversAdapter
 from app.ui.adapters.balance_adapter import BalanceAdapter
 from app.ui.adapters.reports_adapter import ReportsAdapter
+from app.ui.adapters.backups_adapter import BackupsAdapter
+from app.ui.adapters.audit_adapter import AuditAdapter
+from app.ui.adapters.settings_adapter import SettingsAdapter
 from app.ui.adapters.init_adapter import initialize_application
+from app.database.schema import migrate
 
 
 def _identifiant_windows() -> None:
@@ -38,7 +42,13 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     apply_theme(app)
-    
+
+    # Migrer la base de données si nécessaire
+    from app.database.connection import get_connection
+    conn = get_connection()
+    migrate(conn)
+    conn.close()
+
     # Initialiser l'application (admin + exercice)
     initialize_application()
     
@@ -54,9 +64,12 @@ def main() -> int:
     leftovers = LeftoversAdapter()
     balance = BalanceAdapter()
     reports = ReportsAdapter()
+    backups = BackupsAdapter()
+    audit = AuditAdapter()
+    settings = SettingsAdapter()
     
     fenetre = MainWindow(auth, dashboard, members, monthly, funeral, parallel,
-                         fines, expenses, leftovers, balance, reports)
+                         fines, expenses, leftovers, balance, reports, backups, audit, settings)
     fenetre.show()
     return app.exec()
 

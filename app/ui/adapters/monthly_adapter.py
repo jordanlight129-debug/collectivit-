@@ -46,11 +46,11 @@ class MonthlyAdapter:
                     tariff_woman = row["montant"]
             
             # Récupérer le tableau mensuel
-            tableau = tableau_mensuel(conn, exercice_id)
+            page = tableau_mensuel(conn, exercice_id)
             
             # Convertir en MonthlyMember
             members = []
-            for ligne in tableau:
+            for ligne in page.lignes:
                 cells = self._build_cells(ligne)
                 members.append(MonthlyMember(
                     carnet=f"Carnet {ligne.numero_carnet}",
@@ -90,6 +90,16 @@ class MonthlyAdapter:
 
     def _build_cells(self, ligne) -> tuple[MonthlyCell, ...]:
         """Construit les cellules mensuelles à partir de la ligne du tableau."""
-        # Pour l'instant, retourne des cellules vides
-        # À implémenter avec les données réelles par mois
-        return ()
+        from app.ui.ports_monthly import MonthlyCell
+        from app.services.regles import month_label
+        
+        cells = []
+        for cell in ligne.releve.cells:
+            cells.append(MonthlyCell(
+                month=month_label(cell.month),
+                status=cell.status,
+                due=cell.due,
+                paid=cell.paid,
+                debt=cell.debt
+            ))
+        return tuple(cells)

@@ -3,12 +3,12 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject
 
-from app.ui.ports_reports import ReportsData, ReportsPort
+from app.ui.ports_backups import BackupsData, BackupsPort
 from app.ui.views.backups import BackupsView
 
 
 class BackupsPresenter(QObject):
-    def __init__(self, view: BackupsView, port: ReportsPort, parent: QObject | None = None) -> None:
+    def __init__(self, view: BackupsView, port: BackupsPort, parent: QObject | None = None) -> None:
         super().__init__(parent or view)
         self._view = view
         self._port = port

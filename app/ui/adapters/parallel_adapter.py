@@ -33,6 +33,26 @@ class ParallelAdapter:
             # Convertir en ParallelSubscription
             subscriptions = []
             for s in subs:
+                # Calculer le total attendu et collecté
+                from app.repositories import membres, versements
+                from app.models.sexe import Sexe
+
+                # Compter les membres actifs
+                total_hommes = membres.count(conn, sexe=Sexe.HOMME)
+                total_femmes = membres.count(conn, sexe=Sexe.FEMME)
+
+                total_expected = (s.montant_homme * total_hommes) + (s.montant_femme * total_femmes)
+
+                # Calculer le total collecté pour cette cotisation
+                total_collected = 0
+                if s.id:
+                    collectes = conn.execute(
+                        "SELECT COALESCE(SUM(montant), 0) FROM versements "
+                        "WHERE cotisation_parallele_id = ?",
+                        (s.id,)
+                    ).fetchone()
+                    total_collected = collectes[0] if collectes else 0
+
                 subscriptions.append(ParallelSubscription(
                     id=s.id,
                     name=s.nom,
@@ -40,8 +60,8 @@ class ParallelAdapter:
                     end_date=s.date_fin,
                     amount_man=s.montant_homme,
                     amount_woman=s.montant_femme,
-                    total_expected=0,  # À calculer
-                    total_collected=0,  # À calculer
+                    total_expected=total_expected,
+                    total_collected=total_collected,
                 ))
 
             conn.close()
