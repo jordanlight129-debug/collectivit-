@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
         self.login_presenter = LoginPresenter(self.login_view, auth, self)
         self.login_presenter.authenticated.connect(self._on_authenticated)
         self.shell.logout_requested.connect(self._on_logout)
-        self.shell.password_requested.connect(lambda: self._bientot("Changement de mot de passe", _DIALOGUES))
+        self.shell.password_requested.connect(lambda: self.toast.popup("info", "Changement de mot de passe", "Fonctionnalité à implémenter"))
         self.shell.exercise_selected.connect(self.dashboard_presenter.show_exercise)
         self.shell.exercise_selected.connect(self.members_presenter.show_exercise)
         self.shell.exercise_selected.connect(self.monthly_presenter.show_exercise)
