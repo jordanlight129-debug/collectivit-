@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Protocol
 
 
@@ -50,6 +51,10 @@ class AuthPort(Protocol):
     """Authentification : aujourd'hui MockAuth, demain un adaptateur sur auth_service."""
 
     def login(self, identifiant: str, password: str) -> LoginResult: ...
+
+    def logout(self) -> None: ...
+
+    def change_password(self, current_password: str, new_password: str) -> None: ...
 
 
 @dataclass(frozen=True)

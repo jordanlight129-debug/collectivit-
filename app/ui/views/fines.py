@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import (QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit,
+from PySide6.QtWidgets import (QComboBox, QGridLayout, QHBoxLayout, QLabel, QLayout, QLineEdit,
                                QVBoxLayout, QWidget)
 
 from app.ui.presenters.fines_model import FineRow, FinesViewModel
@@ -11,17 +11,17 @@ from app.ui.theme.tokens import Color, Layout
 from app.ui.widgets.badge import Badge
 from app.ui.widgets.base import make_label
 from app.ui.widgets.button import AppButton, Variant
-from app.ui.widgets.card import Card, Separator
+from app.ui.widgets.card import Card, Separator, StatCard
 from app.ui.widgets.page_header import PageHeader
 
 _COLONNES = (
     ("date", "DATE", 2, False),
-    ("carnet", "N° CARNET", 2, False),
     ("name", "MEMBRE", 4, False),
     ("label", "LIBELLÉ", 3, False),
-    ("expected", "ATTENDU (FCFA)", 2, True),
-    ("collected", "COLLECTÉ (FCFA)", 2, True),
-    ("remaining", "RESTANT (FCFA)", 2, True),
+    ("expected", "ATTENDU", 2, True),
+    ("collected", "COLLECTÉ", 2, True),
+    ("remaining", "MANQUE À GAGNER", 2, True),
+    ("status", "STATUT", 2, False),
 )
 _COLONNE_ACTIONS = len(_COLONNES)
 _PAD = 16
@@ -48,6 +48,7 @@ def _marges(colonne: int) -> tuple[int, int]:
 
 class FinesView(QWidget):
     search_changed = Signal(str)
+    status_changed = Signal(str)
     sort_requested = Signal(str)
     page_requested = Signal(int)
     add_requested = Signal()
@@ -65,12 +66,23 @@ class FinesView(QWidget):
         self.header.add_action(self.add_button)
         corps.addWidget(self.header)
 
+        resume = QHBoxLayout()
+        resume.setSpacing(Layout.CARD_GAP)
+        self.expected_card = StatCard()
+        self.collected_card = StatCard()
+        self.remaining_card = StatCard()
+        for card in (self.expected_card, self.collected_card, self.remaining_card):
+            resume.addWidget(card, 1)
+        corps.addLayout(resume)
+
         corps.addWidget(self._carte_filtres())
         corps.addWidget(self._carte_tableau())
         corps.addStretch(1)
 
         self._row_count = 0
         self.search.textChanged.connect(self.search_changed.emit)
+        self.status_combo.currentIndexChanged.connect(
+            lambda _index: self.status_changed.emit(str(self.status_combo.currentData())))
         self._find = QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self)
         self._find.activated.connect(self.focus_search)
         self.add_button.clicked.connect(lambda: self.add_requested.emit())
@@ -85,8 +97,14 @@ class FinesView(QWidget):
         self.search.setFixedHeight(Layout.INPUT_HEIGHT)
         self.search.setMinimumWidth(320)
         ligne.addWidget(self.search, 3)
-        ligne.addStretch(2)
-        ligne.addWidget(make_label("Ctrl + F pour rechercher · clic sur un en-tête pour trier", "caption"))
+        self.status_combo = QComboBox()
+        for label, key in (("Statut : Tous", "tous"), ("Payée", "payee"),
+                           ("Partielle", "partielle"), ("Impayée", "impayee")):
+            self.status_combo.addItem(label, key)
+        self.status_combo.setFixedHeight(Layout.INPUT_HEIGHT)
+        self.status_combo.setMinimumWidth(160)
+        ligne.addWidget(self.status_combo)
+        ligne.addWidget(make_label("Période : Exercice", "caption"))
         carte.body.addLayout(ligne)
         return carte
 
@@ -119,6 +137,11 @@ class FinesView(QWidget):
 
     def set_model(self, model: FinesViewModel) -> None:
         self.header.set_subtitle(model.subtitle)
+        self.expected_card.set_content("Amendes attendues", f"{model.total_expected} FCFA", "Montant total infligé")
+        self.collected_card.set_content("Amendes collectées", f"{model.total_collected} FCFA", "Encaissé", "vert")
+        self.remaining_card.set_content("Manque à gagner", f"{model.total_remaining} FCFA", "Non encaissé",
+                                        "rouge" if model.total_remaining != "0" else "vert")
+        self.add_button.setEnabled(model.is_open)
         self._fill_table(model)
         self.counter.setText(model.counter)
         self._fill_pager(model)
@@ -137,7 +160,7 @@ class FinesView(QWidget):
             self._remplir_ligne(fine, ligne)
             ligne += 1
         if model.empty:
-            vide = make_label("Aucune amende enregistrée.", "caption")
+            vide = make_label("Aucune amende ne correspond aux filtres.", "caption")
             vide.setContentsMargins(_PAD, 20, _PAD, 20)
             self._grid.addWidget(vide, ligne, 0, 1, _COLONNE_ACTIONS + 1)
         self._row_count = len(model.rows)
@@ -178,27 +201,20 @@ class FinesView(QWidget):
     def _remplir_ligne(self, f: FineRow, ligne: int) -> None:
         gris = Color.GRAY_500
         self._grid.addWidget(self._cellule(f.date, "grid-cell", 0, couleur=gris), ligne, 0)
-        self._grid.addWidget(self._cellule(f.member_carnet, "grid-total", 1), ligne, 1)
-        self._grid.addWidget(self._cellule(f.member_name, "grid-cell", 2), ligne, 2)
-        self._grid.addWidget(self._cellule(f.label, "grid-cell", 3), ligne, 3)
-        self._grid.addWidget(self._cellule(f.amount_expected, "grid-cell", 4, True), ligne, 4)
-        self._grid.addWidget(self._cellule(f.amount_collected, "grid-cell", 5, True), ligne, 5)
+        self._grid.addWidget(self._cellule(f.member_name, "grid-cell", 1), ligne, 1)
+        self._grid.addWidget(self._cellule(f.label, "grid-cell", 2), ligne, 2)
+        self._grid.addWidget(self._cellule(f.amount_expected, "grid-cell", 3, True), ligne, 3)
+        self._grid.addWidget(self._cellule(f.amount_collected, "grid-cell", 4, True), ligne, 4)
         couleur_rest = Color.DANGER_600 if not f.is_paid else Color.SUCCESS_600
-        self._grid.addWidget(self._cellule(f.remaining, "grid-total", 6, True, couleur_rest), ligne, 6)
-        actions = AppButton("•••", Variant.LINK)
-        actions.setFixedWidth(40)
+        self._grid.addWidget(self._cellule(f.remaining, "grid-total", 5, True, couleur_rest), ligne, 5)
+        self._grid.addWidget(Badge(f.status, f.status_kind), ligne, 6,
+                             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        actions = AppButton("Encaisser", Variant.LINK)
+        actions.setToolTip(f"Encaisser une partie ou la totalité de l’amende de {f.member_name}")
+        actions.setEnabled(not f.is_paid)
         actions.clicked.connect(lambda _=False, i=f.id: self.fine_action_requested.emit(i))
         self._grid.addWidget(actions, ligne, _COLONNE_ACTIONS,
                              Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
     def _fill_pager(self, model: FinesViewModel) -> None:
         _clear_layout(self._pager)
-        precedent = AppButton("Précédent", Variant.SECONDARY)
-        precedent.setEnabled(bool(model.rows and len(model.rows) > 0))
-        precedent.clicked.connect(lambda: self.page_requested.emit(1))
-        self._pager.addWidget(precedent)
-        self._pager.addWidget(make_label("Pagination à implémenter", "caption"))
-        suivant = AppButton("Suivant", Variant.SECONDARY)
-        suivant.setEnabled(bool(model.rows and len(model.rows) > 0))
-        suivant.clicked.connect(lambda: self.page_requested.emit(2))
-        self._pager.addWidget(suivant)

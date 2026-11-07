@@ -6,10 +6,13 @@ et sont paramétrables en base (montants selon le sexe, types de décès…).
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
-APP_NAME = "Collectivitée LANTCHIBLE"
+APP_NAME = " Collectivitée LANTCHIBLE"
+ASSOCIATION_NAME = "Collectivitée LANTCHIBLE"
+BRAND_INITIALS = "CL"
 APP_VERSION = "1.0.0"
 CURRENCY = "FCFA"
 
@@ -29,11 +32,11 @@ def _base_dir() -> Path:
 
 
 def _data_root() -> Path:
-    """Dossier des données : projet en dev, %APPDATA% une fois empaqueté."""
+    """Dossier des données : projet en dev, %LOCALAPPDATA% une fois empaqueté."""
     if _is_frozen():
-        appdata = os.environ.get("APPDATA")
-        root = Path(appdata) if appdata else Path.home()
-        return root / "GestionAssociation"
+        local_appdata = os.environ.get("LOCALAPPDATA")
+        root = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
+        return root / "SolidariteEtoile"
     return _base_dir()
 
 
@@ -48,3 +51,13 @@ def ensure_directories() -> None:
     """Crée les dossiers nécessaires au premier lancement."""
     for folder in (DATA_DIR, BACKUP_DIR, EXPORT_DIR):
         folder.mkdir(parents=True, exist_ok=True)
+
+    if _is_frozen():
+        legacy_db = BASE_DIR / "data" / "association.db"
+        if legacy_db.is_file() and not DB_PATH.exists():
+            with legacy_db.open("rb") as source:
+                try:
+                    with DB_PATH.open("xb") as destination:
+                        shutil.copyfileobj(source, destination)
+                except FileExistsError:
+                    pass

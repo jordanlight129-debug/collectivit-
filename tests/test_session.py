@@ -26,9 +26,12 @@ class SessionTest(unittest.TestCase):
     def test_secretaire_limite(self):
         s = Session()
         s.login(user(Role.SECRETAIRE))
+        self.assertTrue(s.can(Permission.MEMBER_CREATE))
+        self.assertTrue(s.can(Permission.PARALLEL_DEFINE))
         self.assertTrue(s.can(Permission.PAYMENT_CREATE))
-        for interdit in (Permission.DELETE, Permission.USERS_MANAGE, Permission.AUDIT_VIEW,
-                         Permission.EXERCISE_CLOSE, Permission.BALANCE_VIEW):
+        for interdit in (Permission.MEMBER_EDIT, Permission.PAYMENT_EDIT, Permission.DELETE,
+                 Permission.USERS_MANAGE, Permission.AUDIT_VIEW, Permission.EXERCISE_CLOSE,
+                 Permission.BALANCE_VIEW, Permission.BACKUP_MANAGE, Permission.SETTINGS_MANAGE):
             self.assertFalse(s.can(interdit))
         with self.assertRaises(PermissionDenied):
             s.require(Permission.DELETE)

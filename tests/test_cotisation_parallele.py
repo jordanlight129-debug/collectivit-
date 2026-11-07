@@ -11,7 +11,7 @@ COT = CotisationParallele(1, 1, "Salle des fêtes", date(2026, 1, 1), date(2026,
 
 
 def membre(sexe=Sexe.HOMME, adhesion=date(2017, 9, 5), deces=None):
-    return Membre(1, "001", "Test", sexe, adhesion, "decede" if deces else "actif", deces)
+    return Membre(1, "0001", "Test", sexe, adhesion, "decede" if deces else "actif", deces)
 
 
 class ParalleleTest(unittest.TestCase):

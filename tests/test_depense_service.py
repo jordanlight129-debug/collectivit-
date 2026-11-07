@@ -1,5 +1,6 @@
 import unittest
 from datetime import date
+from decimal import Decimal
 
 from app.database.connection import get_connection
 from app.database.schema import migrate
@@ -56,6 +57,15 @@ class DepenseServiceTest(unittest.TestCase):
         self.assertEqual((e["action"], e["identifiant"]), (Action.DEPENSE_AJOUT, "yawa"))
         self.assertIn("reliquat", e["detail"])
 
+    def test_montants_de_depense_sont_des_decimal(self):
+        depense = self._dep("Achat précis", Decimal("105000"), Decimal("120000"))
+
+        self.assertIsInstance(depense.montant_prevu, Decimal)
+        self.assertIsInstance(depense.montant_depense, Decimal)
+        self.assertIsInstance(depense.reliquat_montant, Decimal)
+        self.assertEqual(depense.reliquat_montant, Decimal("15000"))
+        self.assertIsInstance(svc.resume(self.conn, self.ex.id).depense, Decimal)
+
     def test_sans_reliquat_prevu_omis_et_depassement(self):
         egal = self._dep("Location salle", 150000, 150000)
         omis = self._dep("Sonorisation", 200000)
@@ -69,7 +79,7 @@ class DepenseServiceTest(unittest.TestCase):
         ok = date(2026, 6, 16)
         cas = [
             dict(libelle=""),
-            dict(depense=-1), dict(depense=12.5), dict(depense=True),
+            dict(depense=-1), dict(depense=12.5), dict(depense=Decimal("12.5")), dict(depense=True),
             dict(prevu=-1), dict(prevu=12.5),
             dict(depense=0, prevu=0),
             dict(d=date(2026, 9, 1)),                        # futur

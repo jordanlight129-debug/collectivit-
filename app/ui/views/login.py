@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
 from app.ui import icons
 from app.ui.theme.tokens import Color, Layout
 from app.ui.widgets.banner import Banner
-from app.ui.widgets.base import make_label
+from app.ui.widgets.base import make_label, set_property
 from app.ui.widgets.button import AppButton, Variant
 from app.ui.widgets.card import Card
 from app.ui.widgets.field import FormField
@@ -85,26 +85,52 @@ class LoginView(QWidget):
         carte = Card(padding=32, spacing=16)
         carte.setFixedWidth(Layout.LOGIN_CARD_WIDTH)
         carte.body.addWidget(_etiquette("Connexion", "LoginTitle"))
-        carte.body.addWidget(make_label("Connectez-vous pour gérer les cotisations de votre association.",
+        carte.body.addWidget(make_label("Saisissez vos identifiants pour accéder au logiciel.",
                                         "page-subtitle", wrap=True))
         self.banner = Banner("danger", "")
         self.banner.hide()
         carte.body.addWidget(self.banner)
 
         self.identifiant = QLineEdit()
-        self.identifiant.setPlaceholderText("ex. ama.kpodar")
+        self.identifiant.setPlaceholderText("ex. yawa.dovi")
         self.identifiant.setMaxLength(64)
         self.mot_de_passe = QLineEdit()
         self.mot_de_passe.setEchoMode(QLineEdit.EchoMode.Password)
         self.mot_de_passe.setPlaceholderText("Votre mot de passe")
+
+        # Champ identifiant
         self.field_identifiant = FormField("Identifiant", self.identifiant)
-        self.field_password = FormField("Mot de passe", self.mot_de_passe)
         carte.body.addWidget(self.field_identifiant)
-        carte.body.addWidget(self.field_password)
+
+        # Conteneur du mot de passe avec le bouton de visibilité
+        password_container = QWidget()
+        password_layout = QHBoxLayout(password_container)
+        password_layout.setContentsMargins(0, 0, 0, 0)
+        password_layout.setSpacing(8)
+        password_layout.addWidget(self.mot_de_passe, 1)
+
+        # Bouton pour afficher/masquer le mot de passe
+        self.password_toggle = QPushButton()
+        self.password_toggle.setFixedSize(24, 24)
+        self.password_toggle.setFlat(True)
+        self.password_toggle.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_password_toggle_icon()
+        self.password_toggle.clicked.connect(self._toggle_password_visibility)
+        password_layout.addWidget(self.password_toggle, 0)
+
+        # Champ mot de passe (étiquette + conteneur)
+        self.field_password_container = QWidget()
+        password_field_layout = QVBoxLayout(self.field_password_container)
+        password_field_layout.setContentsMargins(0, 0, 0, 0)
+        password_field_layout.setSpacing(6)
+        password_label = make_label("Mot de passe", "field-label")
+        password_field_layout.addWidget(password_label)
+        password_field_layout.addWidget(password_container)
+        carte.body.addWidget(self.field_password_container)
 
         self.connect_button = AppButton("Se connecter", Variant.PRIMARY)
         carte.body.addWidget(self.connect_button)
-        carte.body.addWidget(_etiquette("Application locale : aucune connexion Internet requise.",
+        carte.body.addWidget(_etiquette("Mot de passe oublié ? Contactez l’administrateur.",
                                         "LoginFootnote", wrap=True))
 
         self.identifiant.returnPressed.connect(self.mot_de_passe.setFocus)
@@ -116,6 +142,24 @@ class LoginView(QWidget):
 
     def _emettre(self) -> None:
         self.submitted.emit(*self.values())
+
+    def _toggle_password_visibility(self) -> None:
+        """Bascule l'affichage du mot de passe."""
+        if self.mot_de_passe.echoMode() == QLineEdit.EchoMode.Password:
+            self.mot_de_passe.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.mot_de_passe.setEchoMode(QLineEdit.EchoMode.Password)
+        self._update_password_toggle_icon()
+
+    def _update_password_toggle_icon(self) -> None:
+        """Met à jour l'icône du bouton de visibilité."""
+        if self.mot_de_passe.echoMode() == QLineEdit.EchoMode.Password:
+            # Icône « œil fermé » (mot de passe masqué)
+            icon = icons.icon("eye_off", Color.GRAY_500, 16)
+        else:
+            # Icône « œil ouvert » (mot de passe visible)
+            icon = icons.icon("eye", Color.GRAY_500, 16)
+        self.password_toggle.setIcon(icon)
 
     # ---------- API pour le présentateur ----------
     def values(self) -> tuple[str, str]:
@@ -139,13 +183,16 @@ class LoginView(QWidget):
         self.banner.hide()
         self.last_message = ""
         self.field_identifiant.set_error(None)
-        self.field_password.set_error(None)
+        # Retire aussi le marquage rouge du champ mot de passe
+        set_property(self.mot_de_passe, "error", False)
 
     def show_field_errors(self, identifiant: str | None, password: str | None) -> None:
         """Messages sous les champs manquants."""
         self.clear_errors()
         self.field_identifiant.set_error(identifiant)
-        self.field_password.set_error(password)
+        # Pour le mot de passe, l'erreur est affichée dans le bandeau
+        if password:
+            self._show_banner("danger", password)
         (self.identifiant if identifiant else self.mot_de_passe).setFocus()
 
     def show_refused(self, message: str) -> None:
@@ -153,7 +200,7 @@ class LoginView(QWidget):
         self.clear_errors()
         self._show_banner("danger", message)
         self.field_identifiant.mark_invalid(True)
-        self.field_password.mark_invalid(True)
+        set_property(self.mot_de_passe, "error", True)
         self.clear_password()
         self.mot_de_passe.setFocus()
 

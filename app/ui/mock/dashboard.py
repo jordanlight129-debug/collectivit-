@@ -8,7 +8,8 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 
-from app.ui.ports import AlertInfo, DashboardData, PaymentInfo, RubriqueFigures
+from app.ui.ports import (AlertInfo, DashboardData, DebtorInfo, MonthFigures, OperationInfo,
+                          PaymentInfo, RubriqueFigures)
 
 _REFERENCE = DashboardData(
     exercise_label="2025–2026",
@@ -34,9 +35,24 @@ _REFERENCE = DashboardData(
         PaymentInfo("Abla Tsogbé", "Cotisation parallèle « Fête de rentrée »", date(2026, 8, 25), 10_000, "courant"),
         PaymentInfo("Komlan Akakpo", "Cotisation mensuelle", date(2026, 8, 24), 36_000, "courant"),
     ),
+    operations=(
+        OperationInfo(date(2026, 8, 28), "Cotisation mensuelle", "Mensuelle", 18_000, "paye"),
+        OperationInfo(date(2026, 8, 27), "Cotisation funéraire", "Funéraire", 8_000, "paye"),
+        OperationInfo(date(2026, 8, 26), "Cotisation parallèle", "Parallèle", 5_000, "partiel"),
+        OperationInfo(date(2026, 8, 25), "Amende à recouvrer", "Amende", 0, "attente"),
+        OperationInfo(date(2026, 8, 24), "Achat de matériel", "Dépense", -25_000, "reliquat"),
+    ),
+    debtors=(
+        DebtorInfo("Yawo Agbodjan", "Carnet 009", 85_000),
+        DebtorInfo("Esi Amegah", "Carnet 031", 62_000),
+        DebtorInfo("Kodjo Tété", "Carnet 017", 48_000),
+        DebtorInfo("Mawuli Gbedemah", "Carnet 023", 35_000),
+        DebtorInfo("Dédé Lawson", "Carnet 044", 20_000),
+        DebtorInfo("Ama Kossi", "Carnet 052", 55_000),
+    ),
     alerts=(
-        AlertInfo("warning", "L’exercice 2025–2026 se termine dans 14 jours : pensez à préparer la clôture."),
-        AlertInfo("danger", "6 membres ont des dettes de cotisation à recouvrer."),
+        AlertInfo("warning", "L’exercice 2025–2026 prend fin dans 14 jours. Préparez sa clôture."),
+        AlertInfo("danger", "Des dettes restent à recouvrer."),
         AlertInfo("info", "Dernière sauvegarde automatique : 28/08/2026 à 17:42."),
     ),
 )
@@ -61,6 +77,10 @@ _ARCHIVED = DashboardData(
     payments=(
         PaymentInfo("Komlan Akakpo", "Cotisation mensuelle", date(2025, 8, 29), 18_000, "courant"),
         PaymentInfo("Yawo Agbodjan", "Cotisation mensuelle", date(2025, 8, 27), 18_000, "courant"),
+    ),
+    operations=(
+        OperationInfo(date(2025, 8, 29), "Cotisation mensuelle", "Mensuelle", 18_000, "paye"),
+        OperationInfo(date(2025, 8, 27), "Cotisation mensuelle", "Mensuelle", 18_000, "paye"),
     ),
     alerts=(AlertInfo("info", "Exercice clôturé : consultation seulement."),),
 )

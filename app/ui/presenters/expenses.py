@@ -3,14 +3,16 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, Signal
 
-from app.ui.ports_expenses import ExpensesData, ExpensesPort
+from app.ui.ports_expenses import ExpensesData, ExpensesLoadError, ExpensesPort
 from app.ui.presenters.expenses_model import ExpensesQuery, build_view_model
 from app.ui.views.expenses import ExpensesView
 
 
 class ExpensesPresenter(QObject):
+    load_failed = Signal(str)
+
     def __init__(self, view: ExpensesView, port: ExpensesPort, parent: QObject | None = None) -> None:
         super().__init__(parent or view)
         self._view = view
@@ -22,7 +24,13 @@ class ExpensesPresenter(QObject):
         view.page_requested.connect(lambda p: self._changer(page=p))
 
     def show_exercise(self, exercise_label: str) -> None:
-        self._data = self._port.load(exercise_label)
+        try:
+            self._data = self._port.load(exercise_label)
+        except ExpensesLoadError as exc:
+            self._data = None
+            self._view.set_error(str(exc))
+            self.load_failed.emit(str(exc))
+            return
         self._changer(page=1)
 
     def _trier(self, cle: str) -> None:

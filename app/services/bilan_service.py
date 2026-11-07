@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Optional
 
 from app.models.exercice import Exercice
@@ -41,7 +42,7 @@ class LigneBilan:
     rubrique: str
     libelle: str
     du: Optional[int]          # None : pas de « dû » (reliquats)
-    percu: int              # argent encaissé dans l'exercice
+    percu: int | Decimal    # argent encaissé dans l'exercice
     dettes: int = 0         # tout ce que les membres doivent encore (exercice + dettes reportées)
     avances: int = 0        # excédents des membres (y compris avances reportées inutilisées)
     dette_reportee: int = 0
@@ -70,15 +71,15 @@ class LigneBilan:
 class Bilan:
     exercice: Exercice
     lignes: tuple[LigneBilan, ...]      # les 5 rubriques d'entrées, dans l'ordre du cahier
-    depenses: int                       # total dépensé
-    depenses_prevues: int
+    depenses: Decimal                   # total dépensé
+    depenses_prevues: Decimal
     solde_ouverture: int = 0            # solde reporté de l'exercice précédent (signé, pour les calculs)
 
     def ligne(self, rubrique: str) -> LigneBilan:
         return next(l for l in self.lignes if l.rubrique == rubrique)
 
     @property
-    def total_entrees(self) -> int:
+    def total_entrees(self) -> int | Decimal:
         return sum(l.percu for l in self.lignes)
 
     @property
@@ -111,12 +112,12 @@ class Bilan:
         return sum(l.avances for l in self.lignes)
 
     @property
-    def solde(self) -> int:
+    def solde(self) -> Decimal:
         """Résultat de l'année : entrées − dépenses (négatif possible, pour les calculs)."""
         return self.total_entrees - self.depenses
 
     @property
-    def solde_cumule(self) -> int:
+    def solde_cumule(self) -> Decimal:
         """Solde d'ouverture + résultat de l'année (c'est lui qui est reporté à la clôture)."""
         return self.solde_ouverture + self.solde
 

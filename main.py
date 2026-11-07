@@ -35,6 +35,19 @@ def _identifiant_windows() -> None:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("collectivite.gestion.association")
 
 
+def _sauvegarder_a_la_fermeture() -> None:
+    from app.database.connection import get_connection
+    from app.services.backup_service import sauvegarder_automatique
+
+    conn = get_connection()
+    try:
+        sauvegarder_automatique(conn)
+    except Exception as error:
+        print(f"AVERTISSEMENT: sauvegarde automatique impossible: {error}")
+    finally:
+        conn.close()
+
+
 def main() -> int:
     _identifiant_windows()
     # Échelles fractionnaires de Windows (125 %, 150 %) respectées au lieu d'être arrondies.
@@ -45,31 +58,25 @@ def main() -> int:
 
     # Migrer la base de données si nécessaire
     from app.database.connection import get_connection
+    from app.services.backup_service import verifier_integrite
     conn = get_connection()
     migrate(conn)
+
+    # Vérifier l'intégrité de la base de données
+    integrity_ok, integrity_msg = verifier_integrite(conn)
+    if not integrity_ok:
+        print(f"AVERTISSEMENT: Intégrité de la base de données: {integrity_msg}")
     conn.close()
 
     # Initialiser l'application (admin + exercice)
     initialize_application()
-    
-    # Utiliser les adaptateurs backend réels
+    app.aboutToQuit.connect(_sauvegarder_a_la_fermeture)
+
+    # Utiliser uniquement l'adaptateur d'authentification au démarrage
+    # Les autres adaptateurs seront chargés après authentification réussie
     auth = AuthAdapter()
-    dashboard = DashboardAdapter()
-    members = MembersAdapter()
-    monthly = MonthlyAdapter()
-    funeral = FuneralAdapter()
-    parallel = ParallelAdapter()
-    fines = FinesAdapter()
-    expenses = ExpensesAdapter()
-    leftovers = LeftoversAdapter()
-    balance = BalanceAdapter()
-    reports = ReportsAdapter()
-    backups = BackupsAdapter()
-    audit = AuditAdapter()
-    settings = SettingsAdapter()
-    
-    fenetre = MainWindow(auth, dashboard, members, monthly, funeral, parallel,
-                         fines, expenses, leftovers, balance, reports, backups, audit, settings)
+
+    fenetre = MainWindow(auth)
     fenetre.show()
     return app.exec()
 

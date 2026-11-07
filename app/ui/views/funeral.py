@@ -65,6 +65,7 @@ class FuneralView(QWidget):
         self.header.add_action(self.add_button)
         corps.addWidget(self.header)
 
+        corps.addWidget(self._legende())
         corps.addWidget(self._carte_filtres())
         corps.addWidget(self._carte_tableau())
         corps.addStretch(1)
@@ -80,7 +81,7 @@ class FuneralView(QWidget):
         ligne = QHBoxLayout()
         ligne.setSpacing(12)
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Rechercher par nom du défunt…")
+        self.search.setPlaceholderText("Rechercher un membre ou un n° de carnet…")
         self.search.setClearButtonEnabled(True)
         self.search.setFixedHeight(Layout.INPUT_HEIGHT)
         self.search.setMinimumWidth(320)
@@ -90,13 +91,25 @@ class FuneralView(QWidget):
         carte.body.addLayout(ligne)
         return carte
 
+    @staticmethod
+    def _legende() -> QWidget:
+        legende = QWidget()
+        ligne = QHBoxLayout(legende)
+        ligne.setContentsMargins(0, 0, 0, 0)
+        ligne.setSpacing(18)
+        ligne.addWidget(make_label("Légende", "caption"))
+        for couleur, texte in ((Color.SUCCESS_600, "Payé"), (Color.WARNING_600, "Partiel"),
+                               (Color.DANGER_600, "Dette"), (Color.GRAY_500, "Non concerné / exempté")):
+            etiquette = make_label(f"●  {texte}", "caption")
+            etiquette.setStyleSheet(f"color: {couleur};")
+            ligne.addWidget(etiquette)
+        ligne.addStretch(1)
+        return legende
+
     def _carte_tableau(self) -> Card:
         carte = Card(padding=0, spacing=0)
         self._grid = QGridLayout()
         self._grid.setSpacing(0)
-        for colonne, (_cle, _titre, poids, _droite) in enumerate(_COLONNES):
-            self._grid.setColumnStretch(colonne, poids)
-        self._grid.setColumnStretch(_COLONNE_ACTIONS, 1)
         carte.body.addLayout(self._grid)
         carte.body.addWidget(Separator())
         pied = QHBoxLayout()
@@ -125,21 +138,94 @@ class FuneralView(QWidget):
 
     def _fill_table(self, model: FuneralViewModel) -> None:
         _clear_layout(self._grid)
-        for colonne, (cle, titre, _poids, droite) in enumerate(_COLONNES):
-            fleche = (" ▲" if model.rows and model.rows[0] else "") if cle == "date" else ""
-            self._grid.addWidget(self._entete(cle, titre + fleche, colonne, droite), 0, colonne)
-        self._grid.addWidget(self._entete("", "", _COLONNE_ACTIONS, False, cliquable=False),
-                             0, _COLONNE_ACTIONS)
-        ligne = 1
-        for record in model.rows:
-            self._grid.addWidget(Separator(), ligne, 0, 1, _COLONNE_ACTIONS + 1)
-            ligne += 1
-            self._remplir_ligne(record, ligne)
-            ligne += 1
+        from app.ui.widgets.base import ClickableFrame
+
+        labels = ["N°", "MEMBRE"] + [column.title for column in model.columns] + ["DÛ", "PERÇU", "DETTE", "ACTION"]
+        sort_keys = ["carnet", "name"] + [None] * len(model.columns) + ["due", "paid", "debt", None]
+        column_count = len(labels)
+        for column, (text, sort_key) in enumerate(zip(labels, sort_keys)):
+            header = ClickableFrame()
+            header.setObjectName("ColHead")
+            header.setStyleSheet(f"#ColHead {{ background: {Color.GRAY_100}; }}")
+            header.setMinimumHeight(Layout.TABLE_HEADER_HEIGHT)
+            layout = QVBoxLayout(header)
+            layout.setContentsMargins(8 if column else _PAD, 4, 8, 4)
+            caption = make_label(text, "grid-head")
+            layout.addWidget(caption)
+            if 2 <= column < 2 + len(model.columns):
+                death = model.columns[column - 2]
+                layout.addWidget(make_label(death.detail, "caption", wrap=True))
+                layout.addWidget(make_label(death.tariff, "caption", wrap=True))
+            if sort_key:
+                header.clicked.connect(lambda key=sort_key: self.sort_requested.emit(key))
+                header.setCursor(Qt.CursorShape.PointingHandCursor)
+            else:
+                header.setCursor(Qt.CursorShape.ArrowCursor)
+                header.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            self._grid.addWidget(header, 0, column)
+            weight = 4 if column == 1 else (3 if 2 <= column < 2 + len(model.columns) else 1)
+            self._grid.setColumnStretch(column, weight)
+
         if model.empty:
-            vide = make_label("Aucun décès enregistré.", "caption")
-            vide.setContentsMargins(_PAD, 20, _PAD, 20)
-            self._grid.addWidget(vide, ligne, 0, 1, _COLONNE_ACTIONS + 1)
+            empty = make_label("Aucun membre ou aucune collecte ne correspond à la recherche.", "caption")
+            empty.setContentsMargins(_PAD, 20, _PAD, 20)
+            self._grid.addWidget(empty, 1, 0, 1, column_count)
+            self._row_count = 0
+            return
+
+        status_colors = {
+            "paye": (Color.SUCCESS_600, "#E3F4EB"),
+            "partiel": (Color.WARNING_600, "#FDEFDD"),
+            "impaye": (Color.DANGER_600, "#FBE6E6"),
+            "defunt": (Color.GRAY_500, Color.GRAY_100),
+            "exempte": (Color.GRAY_500, Color.GRAY_100),
+            "non_concerne": (Color.GRAY_500, Color.GRAY_100),
+            "na": (Color.GRAY_500, Color.GRAY_100),
+        }
+
+        def add_cell(text: str, row: int, column: int, *, role: str = "grid-cell",
+                     right: bool = False, status: str | None = None) -> None:
+            label = make_label(text, role, wrap=True)
+            label.setMinimumHeight(Layout.TABLE_ROW_HEIGHT + 6)
+            label.setContentsMargins(8 if column else _PAD, 4, _PAD if column == column_count - 1 else 8, 4)
+            align = Qt.AlignmentFlag.AlignRight if right else Qt.AlignmentFlag.AlignLeft
+            label.setAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+            if status in status_colors:
+                foreground, background = status_colors[status]
+                label.setStyleSheet(f"color: {foreground}; background: {background};")
+            self._grid.addWidget(label, row, column)
+
+        for row, member in enumerate(model.rows, start=1):
+            self._grid.addWidget(Separator(), row * 2 - 1, 0, 1, column_count)
+            display_row = row * 2
+            add_cell(member.carnet, display_row, 0, role="grid-total")
+            add_cell(member.name, display_row, 1, role="grid-total")
+            for index, cell in enumerate(member.cells):
+                add_cell(cell.text, display_row, index + 2, status=cell.status)
+            start_total = 2 + len(model.columns)
+            add_cell(member.due, display_row, start_total, right=True)
+            add_cell(member.paid, display_row, start_total + 1, right=True)
+            add_cell(member.debt, display_row, start_total + 2, right=True,
+                     status="impaye" if member.debt not in ("0", "—") else "paye")
+            payment = AppButton("Encaisser", Variant.LINK)
+            payment.setToolTip(f"Enregistrer un versement pour {member.name}")
+            payment.clicked.connect(lambda _=False, i=member.id: self.record_action_requested.emit(i))
+            self._grid.addWidget(payment, display_row, start_total + 3,
+                                 Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+        total_row = len(model.rows) * 2 + 1
+        self._grid.addWidget(Separator(), total_row, 0, 1, column_count)
+        total_label = make_label(model.total_row_label, "grid-total", wrap=True)
+        total_label.setMinimumHeight(Layout.TABLE_ROW_HEIGHT + 6)
+        total_label.setContentsMargins(_PAD, 4, 8, 4)
+        self._grid.addWidget(total_label, total_row + 1, 0, 1, 2)
+        for index in range(len(model.columns)):
+            self._grid.addWidget(QWidget(), total_row + 1, index + 2)
+        start_total = 2 + len(model.columns)
+        add_cell(model.page_due, total_row + 1, start_total, role="grid-total", right=True)
+        add_cell(model.page_paid, total_row + 1, start_total + 1, role="grid-total", right=True)
+        add_cell(model.page_debt, total_row + 1, start_total + 2, role="grid-total", right=True)
+        self._grid.addWidget(QWidget(), total_row + 1, start_total + 3)
         self._row_count = len(model.rows)
 
     def _entete(self, cle: str, texte: str, colonne: int, droite: bool, *, cliquable: bool = True) -> QWidget:
@@ -194,11 +280,11 @@ class FuneralView(QWidget):
     def _fill_pager(self, model: FuneralViewModel) -> None:
         _clear_layout(self._pager)
         precedent = AppButton("Précédent", Variant.SECONDARY)
-        precedent.setEnabled(bool(model.rows and len(model.rows) > 0))
-        precedent.clicked.connect(lambda: self.page_requested.emit(1))
+        precedent.setEnabled(model.has_previous)
+        precedent.clicked.connect(lambda: self.page_requested.emit(model.page - 1))
         self._pager.addWidget(precedent)
-        self._pager.addWidget(make_label("Pagination à implémenter", "caption"))
+        self._pager.addWidget(make_label(f"Page {model.page} sur {model.page_count}", "caption"))
         suivant = AppButton("Suivant", Variant.SECONDARY)
-        suivant.setEnabled(bool(model.rows and len(model.rows) > 0))
-        suivant.clicked.connect(lambda: self.page_requested.emit(2))
+        suivant.setEnabled(model.has_next)
+        suivant.clicked.connect(lambda: self.page_requested.emit(model.page + 1))
         self._pager.addWidget(suivant)

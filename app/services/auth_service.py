@@ -15,7 +15,7 @@ from app.security.passwords import (
 from app.security.session import CurrentUser, Role, Session
 
 MAX_ATTEMPTS = 5
-LOCK_MINUTES = 5
+LOCK_SECONDS = 30
 _FMT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -35,8 +35,8 @@ class InvalidCredentials(AuthError):
 class AccountLocked(AuthError):
     def __init__(self, until: datetime, now: datetime | None = None) -> None:
         self.until = until
-        minutes = max(1, math.ceil(((until - (now or datetime.now())).total_seconds()) / 60))
-        super().__init__(f"Compte verrouillé. Réessayez dans {minutes} minute{'s' if minutes > 1 else ''}.")
+        seconds = max(1, int((until - (now or datetime.now())).total_seconds()))
+        super().__init__(f"Compte verrouillé. Réessayez dans {seconds} seconde{'s' if seconds > 1 else ''}.")
 
 
 class AccountDisabled(AuthError):
@@ -104,9 +104,9 @@ def login(conn: sqlite3.Connection, session: Session, identifiant: str, password
         locked_until: datetime | None = None
         with transaction(conn):
             if attempts >= MAX_ATTEMPTS:
-                locked_until = now + timedelta(minutes=LOCK_MINUTES)
+                locked_until = now + timedelta(seconds=LOCK_SECONDS)
                 utilisateurs.record_failure(conn, user.id, 0, locked_until.strftime(_FMT))
-                detail = f"Compte verrouillé {LOCK_MINUTES} min après {MAX_ATTEMPTS} échecs"
+                detail = f"Compte verrouillé {LOCK_SECONDS} s après {MAX_ATTEMPTS} échecs"
             else:
                 utilisateurs.record_failure(conn, user.id, attempts, None)
                 detail = f"Mot de passe incorrect ({attempts}/{MAX_ATTEMPTS})"

@@ -4,6 +4,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 
 
 @dataclass(frozen=True)
@@ -13,18 +14,18 @@ class Depense:
     date_depense: date
     libelle: str
     beneficiaire: str | None
-    montant_prevu: int
-    montant_depense: int
+    montant_prevu: Decimal
+    montant_depense: Decimal
 
     @property
-    def reliquat_montant(self) -> int:
+    def reliquat_montant(self) -> Decimal:
         """Ce qui reste du montant prévu (devient un reliquat)."""
-        return max(self.montant_prevu - self.montant_depense, 0)
+        return max(self.montant_prevu - self.montant_depense, Decimal(0))
 
     @property
-    def depassement(self) -> int:
+    def depassement(self) -> Decimal:
         """Ce qui a été dépensé au-delà du montant prévu."""
-        return max(self.montant_depense - self.montant_prevu, 0)
+        return max(self.montant_depense - self.montant_prevu, Decimal(0))
 
     @classmethod
     def from_row(cls, row: sqlite3.Row) -> "Depense":
@@ -34,8 +35,8 @@ class Depense:
             date_depense=date.fromisoformat(row["date_depense"]),
             libelle=row["libelle"],
             beneficiaire=row["beneficiaire"],
-            montant_prevu=row["montant_prevu"],
-            montant_depense=row["montant_depense"],
+            montant_prevu=Decimal(str(row["montant_prevu"])),
+            montant_depense=Decimal(str(row["montant_depense"])),
         )
 
 
@@ -45,7 +46,7 @@ class Reliquat:
     exercice_id: int
     depense_id: int
     nom: str
-    montant: int
+    montant: Decimal
     date_reliquat: date
 
     @classmethod
@@ -55,7 +56,7 @@ class Reliquat:
             exercice_id=row["exercice_id"],
             depense_id=row["depense_id"],
             nom=row["nom"],
-            montant=row["montant"],
+            montant=Decimal(str(row["montant"])),
             date_reliquat=date.fromisoformat(row["date_reliquat"]),
         )
 

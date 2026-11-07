@@ -2,17 +2,55 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import date
 
 from app.database.connection import get_connection
 from app.repositories import exercices, cotisations_paralleles
-from app.ui.ports_parallel import ParallelData, ParallelSubscription
+from app.security.session import Session
+from app.services.parallele_service import creer_cotisation
+from app.services.reglement_service import enregistrer_paiement
+from app.services.tableau_parallele import tableau as tableau_parallele
+from app.ui.ports_parallel import ParallelData, ParallelMemberInfo, ParallelSubscription
 
 
 class ParallelAdapter:
     """Implémente ParallelPort en utilisant les services."""
 
     def __init__(self) -> None:
-        pass
+        self._session = Session()
+
+    def set_session(self, session: Session) -> None:
+        self._session = session
+
+    def add_subscription(self, nom: str, date_debut: str, date_fin: str,
+                         montant_homme: int, montant_femme: int) -> int:
+        conn = get_connection()
+        try:
+            subscription = creer_cotisation(
+                conn, self._session, nom, date.fromisoformat(date_debut),
+                date.fromisoformat(date_fin), montant_homme, montant_femme,
+            )
+            return subscription.id
+        finally:
+            conn.close()
+
+    def record_payment(self, exercise_label: str, membre_id: int, cotisation_id: int,
+                       montant: int, date_versement: str, mode: str = "global", note: str = "",
+                       confirmer_excedent: bool = False) -> int:
+        conn = get_connection()
+        try:
+            exercice = exercices.get_by_libelle(conn, exercise_label)
+            if exercice is None:
+                raise ValueError(f"Exercice introuvable : {exercise_label}")
+            receipt = enregistrer_paiement(
+                conn, self._session, membre_id, exercice.id, "parallele", montant,
+                mode=mode, cotisation_id=cotisation_id,
+                date_versement=date.fromisoformat(date_versement), note=note,
+                confirmer_excedent=confirmer_excedent,
+            )
+            return receipt.numero
+        finally:
+            conn.close()
 
     def load(self, exercise_label: str) -> ParallelData:
         conn = get_connection()
@@ -27,41 +65,32 @@ class ParallelAdapter:
             exercice_id = exercice.id
             is_open = exercice.statut == "ouvert"
 
-            # Récupérer les cotisations parallèles
+            # Récupérer les cotisations parallèles avec leurs lignes de cotisation métier
             subs = cotisations_paralleles.list_for_exercice(conn, exercice_id)
 
-            # Convertir en ParallelSubscription
             subscriptions = []
             for s in subs:
-                # Calculer le total attendu et collecté
-                from app.repositories import membres, versements
-                from app.models.sexe import Sexe
-
-                # Compter les membres actifs
-                total_hommes = membres.count(conn, sexe=Sexe.HOMME)
-                total_femmes = membres.count(conn, sexe=Sexe.FEMME)
-
-                total_expected = (s.montant_homme * total_hommes) + (s.montant_femme * total_femmes)
-
-                # Calculer le total collecté pour cette cotisation
-                total_collected = 0
-                if s.id:
-                    collectes = conn.execute(
-                        "SELECT COALESCE(SUM(montant), 0) FROM versements "
-                        "WHERE cotisation_parallele_id = ?",
-                        (s.id,)
-                    ).fetchone()
-                    total_collected = collectes[0] if collectes else 0
-
+                tableau = tableau_parallele(conn, s.id)
+                members = tuple(ParallelMemberInfo(
+                    id=line.membre.id,
+                    carnet=line.membre.numero_carnet,
+                    name=line.membre.nom,
+                    sex=line.membre.sexe.value,
+                    expected=line.releve.due,
+                    collected=line.releve.paid,
+                    debt=line.releve.debt,
+                    status=line.releve.status,
+                ) for line in tableau.lignes)
                 subscriptions.append(ParallelSubscription(
                     id=s.id,
                     name=s.nom,
-                    start_date=s.date_debut,
-                    end_date=s.date_fin,
+                    start_date=s.date_debut.strftime("%d/%m/%Y"),
+                    end_date=s.date_fin.strftime("%d/%m/%Y"),
                     amount_man=s.montant_homme,
                     amount_woman=s.montant_femme,
-                    total_expected=total_expected,
-                    total_collected=total_collected,
+                    total_expected=tableau.general.du,
+                    total_collected=tableau.general.percu,
+                    members=members,
                 ))
 
             conn.close()

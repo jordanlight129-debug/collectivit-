@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 
@@ -13,3 +14,4 @@ class ReportsData:
 
 class ReportsPort(Protocol):
     def load(self, exercise_label: str) -> ReportsData: ...
+    def export_report(self, exercise_label: str, report_key: str, file_format: str) -> Path: ...

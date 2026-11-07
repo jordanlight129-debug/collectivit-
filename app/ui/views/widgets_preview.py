@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.config import APP_NAME
+from app.config import ASSOCIATION_NAME, BRAND_INITIALS
 from app.services.affichage import DETTE, EXCEDENT, SOLDE, Situation
 from app.ui.format import format_fcfa
 from app.ui.navigation import Page, allowed_keys
@@ -38,8 +39,8 @@ class WidgetsPreview(QMainWindow):
         racine.setContentsMargins(0, 0, 0, 0)
         racine.setSpacing(0)
 
-        self.sidebar = Sidebar(brand_name="Collectivité LANTCHIBLE", brand_sub="Gestion d’association",
-                               brand_initials="CL", footer="Version 1.0 · Mode hors ligne")
+        self.sidebar = Sidebar(brand_name=ASSOCIATION_NAME, brand_sub="Gestion d’association",
+                       brand_initials=BRAND_INITIALS, footer="Version 1.0 · Mode hors ligne")
         self.sidebar.set_active(Page.DASHBOARD)
         self.sidebar.navigate.connect(self._on_navigate)
         racine.addWidget(self.sidebar)
@@ -47,7 +48,7 @@ class WidgetsPreview(QMainWindow):
         droite = QVBoxLayout()
         droite.setContentsMargins(0, 0, 0, 0)
         droite.setSpacing(0)
-        self.topbar = TopBar("Collectivité LANTCHIBLE")
+        self.topbar = TopBar(f"Association {ASSOCIATION_NAME}")
         self.topbar.set_exercise("Exercice 2025–2026 (sept. → août)")
         self.topbar.set_user("Ama Kpodar", "Administrateur")
         self.topbar.exercise_requested.connect(lambda w: self.toast.popup("warning", "Sélecteur d'exercice", "Popover à venir (étape suivante)."))

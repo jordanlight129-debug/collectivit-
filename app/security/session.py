@@ -19,16 +19,16 @@ class Role(str, Enum):
 
 
 class Permission(str, Enum):
-    # Saisie (administrateur et secrétaires)
+    # Création (administrateur et secrétaires)
     MEMBER_CREATE = "member_create"
-    MEMBER_EDIT = "member_edit"
     PAYMENT_CREATE = "payment_create"
     EXPENSE_CREATE = "expense_create"
     FINE_CREATE = "fine_create"
     DEATH_CREATE = "death_create"
+    PARALLEL_DEFINE = "parallel_define"
     EXPORT = "export"
     # Administrateur uniquement
-    PARALLEL_DEFINE = "parallel_define"
+    MEMBER_EDIT = "member_edit"
     DELETE = "delete"
     USERS_MANAGE = "users_manage"
     AUDIT_VIEW = "audit_view"
@@ -40,11 +40,11 @@ class Permission(str, Enum):
 
 _SECRETARY_PERMISSIONS = frozenset({
     Permission.MEMBER_CREATE,
-    Permission.MEMBER_EDIT,       # le cahier n'interdit pas la modification aux secrétaires
     Permission.PAYMENT_CREATE,
     Permission.EXPENSE_CREATE,
     Permission.FINE_CREATE,
     Permission.DEATH_CREATE,
+    Permission.PARALLEL_DEFINE,
     Permission.EXPORT,
 })
 

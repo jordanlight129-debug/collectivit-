@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from PySide6.QtWidgets import QWidget
 
@@ -35,8 +36,8 @@ class EditExpenseDialog(FormDialog):
         self.date_field = DateInput("Date de la dépense", required=True)
         self.add_field(self.date_field)
 
-    def set_data(self, libelle: str, beneficiaire: str | None, montant_prevu: int,
-                 montant_depense: int, date_depense: str) -> None:
+    def set_data(self, libelle: str, beneficiaire: str | None, montant_prevu: Decimal,
+                 montant_depense: Decimal, date_depense: str) -> None:
         """Pré-remplit le formulaire avec les données existantes."""
         self.label_field.set_value(libelle)
         self.beneficiary_field.set_value(beneficiaire or "")
@@ -48,7 +49,7 @@ class EditExpenseDialog(FormDialog):
         return {
             "libelle": self.label_field.value(),
             "beneficiaire": self.beneficiary_field.value() or None,
-            "montant_prevu": int(self.planned_field.value()),
-            "montant_depense": int(self.spent_field.value()),
+            "montant_prevu": Decimal(self.planned_field.value()),
+            "montant_depense": Decimal(self.spent_field.value()),
             "date_depense": self.date_field.value(),
         }

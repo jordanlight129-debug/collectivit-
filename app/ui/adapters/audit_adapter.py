@@ -1,53 +1,45 @@
-"""Adaptateur du journal d'audit : connecte aux services d'audit."""
+"""Adaptateur du journal d'audit : connecte AuditPort au journal d'audit de sécurité."""
 from __future__ import annotations
 
-import sqlite3
+import logging
+from contextlib import closing
 from datetime import datetime
 
 from app.database.connection import get_connection
-from app.repositories import historique
+from app.security import audit
 from app.ui.ports_audit import AuditData, AuditLog
+
+logger = logging.getLogger(__name__)
+
+MAX_ENTREES = 200          # entrées les plus récentes affichées
+
+
+def _formater_date(date_heure: str | None) -> str:
+    """« 2026-11-02 10:15:00 » → « 02/11/2026 10:15 »."""
+    if not date_heure:
+        return "—"
+    try:
+        return datetime.fromisoformat(date_heure).strftime("%d/%m/%Y %H:%M")
+    except ValueError:
+        return date_heure
 
 
 class AuditAdapter:
-    """Implémente l'interface pour le journal d'audit."""
-
-    def __init__(self) -> None:
-        pass
+    """Implémente AuditPort : lit le journal d'audit (table journal_audit, en lecture seule)."""
 
     def load(self, exercise_label: str) -> AuditData:
-        """Charge le journal d'audit."""
-        conn = get_connection()
         try:
-            # Lister les entrées d'audit
-            logs = historique.lister(conn, limit=100)
-            conn.close()
-
-            # Convertir en AuditLog
-            audit_logs = []
-            for log in logs:
-                # Formater la date
-                date_str = log.date_action.strftime("%d/%m/%Y %H:%M") if log.date_action else "—"
-
-                audit_logs.append(AuditLog(
-                    id=log.id,
-                    date=date_str,
-                    user=log.utilisateur_nom if log.utilisateur_nom else "—",
-                    action=log.action,
-                    entity=log.entite if log.entite else "—",
-                    details=log.details if log.details else ""
-                ))
-
-            return AuditData(
-                exercise_label=exercise_label,
-                logs=tuple(audit_logs)
-            )
-        except Exception as e:
-            conn.close()
-            print(f"Erreur audit adapter: {e}")
-            import traceback
-            traceback.print_exc()
-            return AuditData(
-                exercise_label=exercise_label,
-                logs=()
-            )
+            with closing(get_connection()) as conn:
+                lignes = audit.list_entries(conn, limit=MAX_ENTREES)
+                logs = tuple(AuditLog(
+                    id=row["id"],
+                    date=_formater_date(row["date_heure"]),
+                    user=row["identifiant"] or "—",
+                    action=row["action"],
+                    entity=row["objet"] or "—",
+                    details=row["detail"] or "",
+                ) for row in lignes)
+            return AuditData(exercise_label=exercise_label, logs=logs)
+        except Exception:
+            logger.exception("Chargement du journal d'audit impossible")
+            return AuditData(exercise_label=exercise_label, logs=())

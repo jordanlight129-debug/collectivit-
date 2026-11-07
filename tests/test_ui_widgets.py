@@ -16,7 +16,9 @@ from app.ui.widgets.badge import Badge, status_badge
 from app.ui.widgets.banner import Banner, Toast
 from app.ui.widgets.button import AppButton, IconButton, Variant
 from app.ui.widgets.card import StatCard
+from app.ui.widgets.dialog import FormDialog
 from app.ui.widgets.field import FormField
+from app.ui.widgets.form import NumberInput, TextInput
 from app.ui.widgets.labels import SituationLabel
 from app.ui.widgets.page_header import PageHeader
 from app.ui.widgets.sidebar import Sidebar
@@ -108,6 +110,19 @@ class WidgetsTest(unittest.TestCase):
         self.assertEqual((toast.kind, toast.title_text), ("success", "Versement enregistré"))
         self.assertLessEqual(toast.geometry().right(), parent.width())
         self.assertLessEqual(toast.geometry().bottom(), parent.height())
+
+        parent.resize(360, 400)
+        parent.show()
+        title = "Confirmation d’une opération financière terminée avec succès"
+        message = "Le versement a été enregistré et son reçu est disponible dans l’historique du membre."
+        toast.popup("success", title, message)
+        self.app.processEvents()
+        self.assertTrue(toast._title.wordWrap())
+        self.assertGreater(toast._title.height(), toast._title.fontMetrics().height())
+        self.assertEqual(toast.width(), parent.width() - 48)
+        self.assertGreaterEqual(toast._timer.interval(), 3500)
+        self.assertLessEqual(toast.geometry().right() + 1, parent.width())
+        self.assertLessEqual(toast.geometry().bottom() + 1, parent.height())
         with self.assertRaises(ValueError):
             toast.popup("autre", "x")
 
@@ -166,6 +181,26 @@ class WidgetsTest(unittest.TestCase):
         en_tete.add_action(AppButton("Ajouter un membre", Variant.PRIMARY, "plus"))
         en_tete.set_subtitle("")
         self.assertEqual((en_tete.action_count(), en_tete._subtitle.isHidden()), (1, True))
+
+    def test_previsualisation_d_un_formulaire_avec_montant(self):
+        class PreviewDialog(FormDialog):
+            def __init__(self):
+                super().__init__("Aperçu de la saisie")
+                self.libelle = TextInput("Libellé", required=True)
+                self.montant = NumberInput("Montant reçu (FCFA)", required=True, min_value=1)
+                self.add_field(self.libelle)
+                self.add_field(self.montant)
+                self.libelle.set_value("Cotisation mensuelle")
+                self.montant.input_widget.setValue(18000)
+
+            def get_data(self):
+                return {"libelle": self.libelle.value(), "montant": int(self.montant.value())}
+
+        dialog = PreviewDialog()
+        preview = dialog.preview_text()
+        self.assertIn("Cotisation mensuelle", preview)
+        self.assertIn("Montant reçu", preview)
+        self.assertIn("18 000 FCFA", preview)
 
 
 if __name__ == "__main__":

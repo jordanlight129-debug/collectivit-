@@ -3,16 +3,17 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date
+from decimal import Decimal
 
 from app.models.depense import Reliquat, ReliquatLigne
 
 
 def create(conn: sqlite3.Connection, exercice_id: int, depense_id: int, nom: str,
-           montant: int, date_reliquat: date) -> int:
+           montant: Decimal, date_reliquat: date) -> int:
     cur = conn.execute(
         "INSERT INTO reliquats (exercice_id, depense_id, nom, montant, date_reliquat) "
         "VALUES (?, ?, ?, ?, ?)",
-        (exercice_id, depense_id, nom, montant, date_reliquat.isoformat()),
+        (exercice_id, depense_id, nom, int(montant), date_reliquat.isoformat()),
     )
     return int(cur.lastrowid)
 
@@ -33,8 +34,8 @@ def list_for_exercice(conn: sqlite3.Connection, exercice_id: int) -> list[Reliqu
     return [ReliquatLigne(Reliquat.from_row(r), r["depense_libelle"]) for r in rows]
 
 
-def total(conn: sqlite3.Connection, exercice_id: int) -> int:
+def total(conn: sqlite3.Connection, exercice_id: int) -> Decimal:
     row = conn.execute(
         "SELECT COALESCE(SUM(montant), 0) FROM reliquats WHERE exercice_id = ?", (exercice_id,)
     ).fetchone()
-    return int(row[0])
+    return Decimal(str(row[0]))

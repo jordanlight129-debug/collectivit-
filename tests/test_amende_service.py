@@ -49,7 +49,7 @@ class AmendeServiceTest(unittest.TestCase):
                          ("Absence AG", "Absence à l'assemblée générale", 5000, 0, self.ex.id))
         self.assertEqual((a.statut, a.manque_a_gagner), (IMPAYEE, 5000))
         e = audit.list_entries(self.conn)[0]
-        self.assertEqual((e["action"], e["objet"], e["identifiant"]), (Action.AMENDE_AJOUT, "Carnet 001", "yawa"))
+        self.assertEqual((e["action"], e["objet"], e["identifiant"]), (Action.AMENDE_AJOUT, "Carnet 0001", "yawa"))
 
     def test_libelle_par_defaut_date_du_jour_et_collecte_initiale(self):
         a = svc.creer_amende(self.conn, self.sec, self.efua.id, "Retard", "", 2000, None, 2000, today=TODAY)
@@ -84,7 +84,7 @@ class AmendeServiceTest(unittest.TestCase):
         with self.assertRaises(AmendeError):
             svc.collecter(self.conn, self.sec, a.id, 1)            # déjà encaissée
         e = audit.list_entries(self.conn)[0]
-        self.assertEqual((e["action"], e["objet"]), (Action.AMENDE_COLLECTE, "Carnet 001"))
+        self.assertEqual((e["action"], e["objet"]), (Action.AMENDE_COLLECTE, "Carnet 0001"))
         self.assertIn("reste 0", e["detail"].replace("\u00A0", " "))
 
     def test_montants_et_exercice_cloture_pour_la_collecte(self):
@@ -115,7 +115,7 @@ class AmendeServiceTest(unittest.TestCase):
         self.assertEqual(p.general, r)
         self.assertEqual((p.lignes[0].amende.date_amende, p.lignes[-1].amende.date_amende),
                          (date(2026, 6, 15), date(2026, 2, 12)))        # plus récentes d'abord
-        self.assertEqual((p.lignes[0].membre_nom, p.lignes[0].numero_carnet), ("Yawo Agbodjan", "001"))
+        self.assertEqual((p.lignes[0].membre_nom, p.lignes[0].numero_carnet), ("Yawo Agbodjan", "0001"))
 
         self.assertEqual(svc.lister(self.conn, self.ex.id, statut="impayee").total, 1)
         self.assertEqual(svc.lister(self.conn, self.ex.id, statut="partielle").total, 1)
@@ -123,7 +123,7 @@ class AmendeServiceTest(unittest.TestCase):
         yawo = svc.lister(self.conn, self.ex.id, search="yawo")
         self.assertEqual((yawo.total, yawo.general.attendu, yawo.general.collecte, yawo.general.manque),
                          (2, 7000, 1000, 6000))
-        self.assertEqual(svc.lister(self.conn, self.ex.id, search="001").total, 2)     # par carnet
+        self.assertEqual(svc.lister(self.conn, self.ex.id, search="0001").total, 2)     # par carnet
         self.assertEqual(svc.lister(self.conn, self.ex.id, membre_id=self.yawo.id).total, 2)
 
         page = svc.lister(self.conn, self.ex.id, limit=2, offset=0)

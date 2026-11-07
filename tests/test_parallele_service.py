@@ -66,9 +66,9 @@ class ParalleleServiceTest(unittest.TestCase):
         self.assertEqual((e["action"], e["identifiant"]), (Action.COTISATION_PARALLELE, "ama"))
         self.assertEqual(len(svc.list_cotisations(self.conn, self.ex.id)), 1)
 
-    def test_secretaire_ne_definit_pas_une_cotisation(self):
-        with self.assertRaises(PermissionDenied):
-            self._cot(nom="Autre cotisation", session=self.sec)
+    def test_secretaire_peut_creer_une_cotisation(self):
+        cotisation = self._cot(nom="Autre cotisation", session=self.sec)
+        self.assertEqual(cotisation.nom, "Autre cotisation")
 
     def test_validations_rien_n_est_ecrit(self):
         d1, d2 = date(2026, 1, 1), date(2026, 6, 30)

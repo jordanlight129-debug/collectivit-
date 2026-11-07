@@ -8,6 +8,7 @@ Le montant est toujours positif : c'est le mot et la couleur qui portent le sens
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 EXCEDENT = "excedent"
 DETTE = "dette"
@@ -20,7 +21,7 @@ _LIBELLES = {EXCEDENT: "Excédent", DETTE: "Dette", SOLDE: "Soldé"}
 @dataclass(frozen=True)
 class Situation:
     kind: str           # EXCEDENT | DETTE | SOLDE
-    montant: int        # toujours >= 0
+    montant: int | Decimal        # toujours >= 0
 
     @property
     def couleur(self) -> str:
@@ -33,10 +34,10 @@ class Situation:
 
     def texte(self) -> str:
         """Ex. « Dette : 378 000 FCFA »."""
-        return f"{self.libelle} : {self.montant:,}".replace(",", "\u00A0") + " FCFA"
+        return f"{self.libelle} : {self.montant:,.0f}".replace(",", "\u00A0") + " FCFA"
 
 
-def depuis_ecart(ecart: int) -> Situation:
+def depuis_ecart(ecart: int | Decimal) -> Situation:
     """ecart = perçu − dû (positif : excédent, négatif : dette)."""
     if ecart > 0:
         return Situation(EXCEDENT, ecart)
@@ -45,5 +46,5 @@ def depuis_ecart(ecart: int) -> Situation:
     return Situation(SOLDE, 0)
 
 
-def situation(du: int, percu: int) -> Situation:
+def situation(du: int | Decimal, percu: int | Decimal) -> Situation:
     return depuis_ecart(percu - du)

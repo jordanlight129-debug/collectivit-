@@ -37,7 +37,7 @@ class HistoriqueServiceTest(unittest.TestCase):
         def mk(nom, sexe, adhesion=date(2017, 9, 5)):
             return membre_service.create_membre(self.conn, self.admin, nom, sexe, adhesion, today=TODAY)
 
-        self.yawo = mk("Yawo Agbodjan", Sexe.HOMME)        # carnet 001
+        self.yawo = mk("Yawo Agbodjan", Sexe.HOMME)        # carnet 0001
         self.efua = mk("Efua Dosseh", Sexe.FEMME)
         self.abla = mk("Abla Tsogbé", Sexe.FEMME)
         self.kossi = mk("Kossi Ayité", Sexe.HOMME)
@@ -109,7 +109,7 @@ class HistoriqueServiceTest(unittest.TestCase):
         self._scenario()
         par_nom = svc.lister(self.conn, exercice_id=self.ex.id, search="yawo")
         self.assertEqual((par_nom.total, par_nom.entrees), (4, 154000))     # 131 000 + 10 000 + 12 000 + 1 000
-        self.assertEqual(svc.lister(self.conn, exercice_id=self.ex.id, search="001").total, 4)   # par carnet
+        self.assertEqual(svc.lister(self.conn, exercice_id=self.ex.id, search="0001").total, 4)   # par carnet
         fiche = svc.historique_membre(self.conn, self.yawo.id, exercice_id=self.ex.id)
         self.assertEqual((fiche.total, fiche.entrees), (4, 154000))
         self.assertEqual({l.rubrique for l in fiche.lignes}, {"mensuelle", "funeraire", "parallele", "amende"})

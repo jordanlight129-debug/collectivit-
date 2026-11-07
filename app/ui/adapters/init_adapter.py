@@ -15,30 +15,16 @@ from app.services.exercice_service import create_exercice, set_funeral_tarifs
 
 
 def ensure_first_admin() -> bool:
-    """Crée le premier administrateur si aucun n'existe.
-    
+    """Vérifie si un administrateur existe.
+
     Returns:
-        True si un admin a été créé, False si un admin existait déjà.
+        True si un admin existe, False sinon.
     """
     conn = get_connection()
     try:
-        if has_admin(conn):
-            conn.close()
-            return False
-        
-        # Créer l'administrateur par défaut
-        with transaction(conn):
-            user_id = create_first_admin(
-                conn,
-                identifiant="admin",
-                nom_complet="Administrateur",
-                password="Admin2026"
-            )
+        has = has_admin(conn)
         conn.close()
-        return True
-    except AuthError:
-        conn.close()
-        return False
+        return has
     except Exception:
         conn.close()
         return False

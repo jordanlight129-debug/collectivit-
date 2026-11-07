@@ -11,6 +11,7 @@ from app.repositories import amendes, encaissements_amendes, exercices, membres
 from app.security import audit
 from app.security.audit import Action
 from app.security.session import Permission, Session
+from app.services import carnet_service
 
 
 class AmendeError(Exception):
@@ -88,7 +89,7 @@ def creer_amende(conn: sqlite3.Connection, session: Session, membre_id: int, nom
                                    montant_attendu, montant_collecte, session.user.id)
         if montant_collecte > 0:
             encaissements_amendes.add(conn, amende_id, montant_collecte, date_amende, session.user.id)
-        audit.log(conn, session.user, Action.AMENDE_AJOUT, f"Carnet {membre.numero_carnet}",
+        audit.log(conn, session.user, Action.AMENDE_AJOUT, carnet_service.format_carnet_label(membre.numero_carnet),
                   f"{nom} · {_fmt(montant_attendu)} · déjà collecté {_fmt(montant_collecte)} · "
                   f"{_d(date_amende)} · exercice {exercice.libelle}")
     return amendes.get(conn, amende_id)
@@ -124,7 +125,7 @@ def collecter(conn: sqlite3.Connection, session: Session, amende_id: int, montan
     with transaction(conn):
         amendes.add_collecte(conn, amende_id, montant)
         encaissements_amendes.add(conn, amende_id, montant, date_encaissement, session.user.id)
-        audit.log(conn, session.user, Action.AMENDE_COLLECTE, f"Carnet {membre.numero_carnet}",
+        audit.log(conn, session.user, Action.AMENDE_COLLECTE, carnet_service.format_carnet_label(membre.numero_carnet),
                   f"{_fmt(montant)} sur « {amende.nom} » · {_d(date_encaissement)} · "
                   f"reste {_fmt(reste - montant)}")
     return amendes.get(conn, amende_id)

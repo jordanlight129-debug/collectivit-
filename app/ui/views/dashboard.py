@@ -10,6 +10,7 @@ from app.ui.presenters.dashboard_model import (DashboardViewModel, DebtorView, O
                                                ShareView)
 from app.ui.theme.tokens import Color, Layout
 from app.ui.widgets.badge import Badge
+from app.ui.widgets.banner import Banner
 from app.ui.widgets.base import make_label
 from app.ui.widgets.button import AppButton, Variant
 from app.ui.widgets.card import Card, Separator, StatCard
@@ -48,6 +49,7 @@ class DashboardView(QWidget):
     member_requested = Signal()
     collecte_requested = Signal()
     export_requested = Signal()          # « Exporter le bilan »
+    export_excel_requested = Signal()
     backup_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -63,6 +65,13 @@ class DashboardView(QWidget):
         self.header.add_action(self.payment_button)
         self.header.add_action(self.expense_button)
         corps.addWidget(self.header)
+
+        self.alerts_container = QWidget()
+        self.alerts_layout = QVBoxLayout(self.alerts_container)
+        self.alerts_layout.setContentsMargins(0, 0, 0, 0)
+        self.alerts_layout.setSpacing(10)
+        corps.addWidget(self.alerts_container)
+        self.alerts_container.hide()
 
         cartes = QGridLayout()
         cartes.setSpacing(Layout.CARD_GAP)
@@ -99,6 +108,7 @@ class DashboardView(QWidget):
         self.member_button.clicked.connect(lambda: self.member_requested.emit())
         self.collecte_button.clicked.connect(lambda: self.collecte_requested.emit())
         self.export_button.clicked.connect(lambda: self.export_requested.emit())
+        self.export_excel_button.clicked.connect(lambda: self.export_excel_requested.emit())
         self.backup_button.clicked.connect(lambda: self.backup_requested.emit())
 
     # ---------- construction ----------
@@ -145,10 +155,12 @@ class DashboardView(QWidget):
         grille.setSpacing(10)
         self.member_button = AppButton("Ajouter un membre", Variant.SECONDARY, "users")
         self.collecte_button = AppButton("Nouvelle collecte", Variant.SECONDARY, "heart")
-        self.export_button = AppButton("Exporter le bilan", Variant.SECONDARY, "file")
+        self.export_button = AppButton("Bilan PDF", Variant.SECONDARY, "file")
+        self.export_excel_button = AppButton("Bilan Excel", Variant.SECONDARY)
         self.backup_button = AppButton("Sauvegarder", Variant.SECONDARY, "database")
         for index, bouton in enumerate((self.member_button, self.collecte_button,
-                                        self.export_button, self.backup_button)):
+                        self.export_button, self.export_excel_button,
+                        self.backup_button)):
             grille.addWidget(bouton, *divmod(index, 2))
         grille.setColumnStretch(0, 1)
         grille.setColumnStretch(1, 1)
@@ -183,6 +195,20 @@ class DashboardView(QWidget):
         for bouton in (self.payment_button, self.expense_button):
             bouton.setEnabled(not model.read_only)
             bouton.setToolTip("Exercice clôturé : saisie impossible" if model.read_only else "")
+
+        while self.alerts_layout.count():
+            item = self.alerts_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        if model.alerts:
+            for alert in model.alerts:
+                self.alerts_layout.addWidget(Banner(alert.kind, alert.text))
+            self.alerts_container.show()
+        else:
+            self.alerts_container.hide()
+
         for carte, stat in zip(self.stat_cards, model.stats):
             carte.set_content(stat.label, stat.amount, stat.note, stat.tone)
         self.chart.set_months([(m.label, m.entrees, m.depenses) for m in model.months])

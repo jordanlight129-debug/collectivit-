@@ -35,6 +35,7 @@ class AddParallelDialog(FormDialog):
 
         # Date de fin
         self.end_field = DateInput("Date de fin", required=True)
+        self.end_field.set_value(date.today().strftime("%Y-%m-%d"))
         self.add_field(self.end_field)
 
     def get_data(self) -> dict:

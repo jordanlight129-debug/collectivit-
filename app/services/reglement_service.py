@@ -21,7 +21,7 @@ from app.repositories import cotisations_paralleles, exercices, membres, reports
 from app.security import audit
 from app.security.audit import Action
 from app.security.session import Permission, Session
-from app.services import deces_service, parallele_service
+from app.services import carnet_service, deces_service, parallele_service
 from app.services.regles import concerned_by_parallel
 
 GLOBAL = "global"
@@ -210,6 +210,6 @@ def enregistrer_paiement(conn: sqlite3.Connection, session: Session, membre_id: 
         detail = (f"Reçu n° {numero} · {RUBRIQUE_LABELS[rubrique]} · {_fmt(montant)} · "
                   + " · ".join(parties) + f" · {_d(date_v)} · exercice {exercice.libelle}")
         action = Action.REGLEMENT_ARRIERES if v.arrieres else Action.VERSEMENT_AJOUT
-        audit.log(conn, session.user, action, f"Carnet {membre.numero_carnet}", detail)
+        audit.log(conn, session.user, action, carnet_service.format_carnet_label(membre.numero_carnet), detail)
 
     return Recu(numero, tuple(versements.get(conn, i) for i in ids), v)

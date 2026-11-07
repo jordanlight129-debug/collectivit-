@@ -9,9 +9,18 @@ from datetime import date
 
 Month = tuple[int, int]          # (année, mois)
 
+_MOIS_ABREGES = ("Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+                 "Juil", "Août", "Sep", "Oct", "Nov", "Déc")
+
 
 def month_of(d: date) -> Month:
     return d.year, d.month
+
+
+def month_label(month: Month) -> str:
+    """Libellé court d'un mois de l'exercice, par exemple « Sep 2026 »."""
+    annee, mois = month
+    return f"{_MOIS_ABREGES[mois - 1]} {annee}"
 
 
 def applicable_months(adhesion: date, deces: date | None, months: list[Month]) -> list[Month]:

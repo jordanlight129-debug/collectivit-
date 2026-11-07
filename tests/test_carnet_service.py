@@ -25,7 +25,7 @@ class CarnetServiceTest(unittest.TestCase):
         self.admin.login(CurrentUser(1, "ama", "Ama K.", Role.ADMINISTRATEUR))
 
     def test_format_par_defaut(self):
-        self.assertEqual(carnets.preview(self.conn), "001")
+        self.assertEqual(carnets.preview(self.conn), "0001")
 
     def test_format_personnalise_admin_seulement(self):
         carnets.set_format(self.conn, self.admin, "lt-", 4, 43)
@@ -40,17 +40,26 @@ class CarnetServiceTest(unittest.TestCase):
             carnets.set_format(self.conn, sec, "", 3, 1)
 
     def test_numero_deja_pris_est_saute(self):
-        membres.create(self.conn, "002", "Reprise Existante", Sexe.FEMME, date(2017, 9, 5))
-        self.assertEqual(carnets.preview(self.conn), "001")
+        membres.create(self.conn, "0002", "Reprise Existante", Sexe.FEMME, date(2017, 9, 5))
+        self.assertEqual(carnets.preview(self.conn), "0001")
         a = membre_service.create_membre(self.conn, self.admin, "Premier Nouveau", Sexe.HOMME, today=TODAY)
         b = membre_service.create_membre(self.conn, self.admin, "Second Nouveau", Sexe.HOMME, today=TODAY)
-        self.assertEqual((a.numero_carnet, b.numero_carnet), ("001", "003"))
+        self.assertEqual((a.numero_carnet, b.numero_carnet), ("0001", "0003"))
+
+    def test_formatage_et_validation_centralisees_4_chiffres(self):
+        self.assertEqual(carnets.formater_carnet(42), "0042")
+        self.assertEqual(carnets.formater_carnet(42, prefix="LT-"), "LT-0042")
+        self.assertEqual(carnets.valider_carnet("0042"), "0042")
+        with self.assertRaises(CarnetError):
+            carnets.valider_carnet("42")
+        with self.assertRaises(CarnetError):
+            carnets.valider_carnet("0042A")
 
     def test_format_invalide(self):
         for prefix, width, nxt in (("a b", 3, 1), ("ABCDEFGHIJK", 3, 1), ("", 0, 1), ("", 9, 1), ("", 3, 0)):
             with self.assertRaises(CarnetError, msg=str((prefix, width, nxt))):
                 carnets.set_format(self.conn, self.admin, prefix, width, nxt)
-        self.assertEqual(carnets.preview(self.conn), "001")
+        self.assertEqual(carnets.preview(self.conn), "0001")
 
 
 if __name__ == "__main__":

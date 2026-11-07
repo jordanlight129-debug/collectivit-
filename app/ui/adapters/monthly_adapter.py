@@ -13,19 +13,21 @@ from app.ui.ports_monthly import MonthlyData, MonthlyMember, MonthlyCell
 class MonthlyAdapter:
     """Implémente MonthlyPort en utilisant les services."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, conn: sqlite3.Connection | None = None) -> None:
+        self._conn = conn
 
     def load(self, exercise_label: str) -> MonthlyData:
-        conn = get_connection()
+        conn = self._conn if self._conn else get_connection()
+        should_close = self._conn is None
         try:
             exercice = conn.execute(
                 "SELECT id, libelle, statut FROM exercices WHERE libelle = ?",
                 (exercise_label,)
             ).fetchone()
-            
+
             if not exercice:
-                conn.close()
+                if should_close:
+                    conn.close()
                 return self._empty_data(exercise_label)
             
             exercice_id = exercice["id"]
@@ -53,20 +55,21 @@ class MonthlyAdapter:
             for ligne in page.lignes:
                 cells = self._build_cells(ligne)
                 members.append(MonthlyMember(
-                    carnet=f"Carnet {ligne.numero_carnet}",
-                    name=ligne.nom,
-                    sexe=ligne.sexe,
-                    joined="01/09/2025",  # À récupérer depuis membre
+                    carnet=ligne.membre.numero_carnet,
+                    name=ligne.membre.nom,
+                    sex=ligne.membre.sexe.value,
+                    joined=ligne.membre.date_adhesion.strftime("%d/%m/%Y"),
                     cells=cells,
-                    total_due=ligne.du,
-                    total_paid=ligne.perçu,
-                    total_debt=ligne.dette,
-                    advance=ligne.avance,
-                    carried_debt=ligne.report_dette,
-                    carried_advance=ligne.report_avance,
+                    total_due=ligne.releve.total_due,
+                    total_paid=ligne.releve.total_paid,
+                    total_debt=ligne.releve.total_debt,
+                    advance=ligne.releve.advance,
+                    carried_debt=ligne.releve.carried_debt,
+                    carried_advance=ligne.releve.carried_advance,
                 ))
-            
-            conn.close()
+
+            if should_close:
+                conn.close()
             return MonthlyData(
                 exercise_label=exercise_label,
                 is_open=is_open,
@@ -75,7 +78,8 @@ class MonthlyAdapter:
                 members=tuple(members)
             )
         except Exception as e:
-            conn.close()
+            if should_close:
+                conn.close()
             print(f"Erreur monthly adapter: {e}")
             return self._empty_data(exercise_label)
 
@@ -92,7 +96,7 @@ class MonthlyAdapter:
         """Construit les cellules mensuelles à partir de la ligne du tableau."""
         from app.ui.ports_monthly import MonthlyCell
         from app.services.regles import month_label
-        
+
         cells = []
         for cell in ligne.releve.cells:
             cells.append(MonthlyCell(

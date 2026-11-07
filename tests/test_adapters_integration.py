@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 # Ajouter le répertoire parent au path
 import sys
@@ -105,10 +106,24 @@ class TestAdaptersIntegration(unittest.TestCase):
 
     def test_auth_adapter(self):
         """Teste l'adaptateur d'authentification."""
+        import unittest.mock
+        # Patch DB_PATH pour utiliser la base temporaire
+        with unittest.mock.patch('app.database.connection.DB_PATH', str(self.test_db)):
+            adapter = AuthAdapter()
+            result = adapter.login("admin", "AdminTest1234")
+            self.assertEqual(result.status, "ok")
+            self.assertIsNotNone(adapter.session.user)
+
+    def test_auth_adapter_change_password(self):
         adapter = AuthAdapter()
-        result = adapter.login("admin", "AdminTest1234")
-        self.assertEqual(result.status, "ok")
-        self.assertIsNotNone(adapter.session.user)
+        with patch("app.ui.adapters.auth_adapter.get_connection",
+                   side_effect=lambda: get_connection(self.test_db)):
+            self.assertEqual(adapter.login("admin", "AdminTest1234").status, "ok")
+            adapter.change_password("AdminTest1234", "Nouveau2026")
+            adapter.logout()
+            self.assertEqual(adapter.login("admin", "Nouveau2026").status, "ok")
+            adapter.logout()
+            self.assertEqual(adapter.login("admin", "AdminTest1234").status, "refused")
 
     def test_dashboard_adapter(self):
         """Teste l'adaptateur du tableau de bord."""
@@ -133,14 +148,14 @@ class TestAdaptersIntegration(unittest.TestCase):
 
     def test_funeral_adapter(self):
         """Teste l'adaptateur des cotisations funéraires."""
-        adapter = FuneralAdapter(self.session)
+        adapter = FuneralAdapter()
         data = adapter.load(self.exercice_label)
         self.assertEqual(data.exercise_label, self.exercice_label)
         self.assertIsInstance(data.records, tuple)
 
     def test_parallel_adapter(self):
         """Teste l'adaptateur des cotisations parallèles."""
-        adapter = ParallelAdapter(self.session)
+        adapter = ParallelAdapter()
         data = adapter.load(self.exercice_label)
         self.assertEqual(data.exercise_label, self.exercice_label)
         self.assertIsInstance(data.subscriptions, tuple)
@@ -150,21 +165,40 @@ class TestAdaptersIntegration(unittest.TestCase):
         adapter = FinesAdapter()
         data = adapter.load(self.exercice_label)
         self.assertEqual(data.exercise_label, self.exercice_label)
-        self.assertIsInstance(data.fines, tuple)
+        self.assertIsInstance(data.records, tuple)
 
     def test_expenses_adapter(self):
         """Teste l'adaptateur des dépenses."""
         adapter = ExpensesAdapter()
-        data = adapter.load(self.exercice_label)
+        with patch("app.ui.adapters.expenses_adapter.get_connection",
+               side_effect=lambda: get_connection(self.test_db)):
+            data = adapter.load(self.exercice_label)
         self.assertEqual(data.exercise_label, self.exercice_label)
-        self.assertIsInstance(data.expenses, tuple)
+        self.assertIsInstance(data.records, tuple)
+
+    def test_expenses_adapter_add_expense(self):
+        """Teste l'ajout d'une dépense avec la session authentifiée."""
+        adapter = ExpensesAdapter()
+        adapter._session = self.session
+        with patch("app.ui.adapters.expenses_adapter.get_connection",
+                   side_effect=lambda: get_connection(self.test_db)):
+            expense_id = adapter.add_expense(
+                self.exercice_label, "Achat de fournitures", "Fournisseur test",
+                1200, 1000, "2026-06-16",
+            )
+            data = adapter.load(self.exercice_label)
+
+        expense = next(record for record in data.records if record.id == expense_id)
+        self.assertEqual(expense.label, "Achat de fournitures")
+        self.assertEqual(expense.amount_planned, 1200)
+        self.assertEqual(expense.amount_spent, 1000)
 
     def test_leftovers_adapter(self):
         """Teste l'adaptateur des reliquats."""
         adapter = LeftoversAdapter()
         data = adapter.load(self.exercice_label)
         self.assertEqual(data.exercise_label, self.exercice_label)
-        self.assertIsInstance(data.leftovers, tuple)
+        self.assertIsInstance(data.records, tuple)
 
     def test_balance_adapter(self):
         """Teste l'adaptateur du solde."""
@@ -198,6 +232,24 @@ class TestAdaptersIntegration(unittest.TestCase):
         data = adapter.load(self.exercice_label)
         self.assertEqual(data.exercise_label, self.exercice_label)
 
+    def test_settings_adapter_gere_les_comptes_secretaires(self):
+        with patch("app.ui.adapters.settings_adapter.get_connection",
+               side_effect=lambda: get_connection(self.test_db)):
+            adapter = SettingsAdapter()
+            adapter.set_session(self.session)
+            adapter.create_secretary("awa.dovi", "Awa Dovi", "Secret2026")
+            data = adapter.load(self.exercice_label)
+            user = next(account for account in data.users if account.identifiant == "awa.dovi")
+            self.assertEqual((user.nom_complet, user.role.label, user.actif),
+                     ("Awa Dovi", "Secrétaire", True))
+            self.assertFalse(hasattr(user, "mot_de_passe_hash"))
+
+            adapter.reset_user_password(user.id, "Nouveau2026")
+            adapter.set_user_active(user.id, False)
+            inactive = next(account for account in adapter.load(self.exercice_label).users
+                    if account.id == user.id)
+            self.assertFalse(inactive.actif)
+
     def test_banner_component(self):
         """Teste le composant Banner pour tous les types acceptés."""
         from PySide6.QtWidgets import QApplication
@@ -225,16 +277,18 @@ class TestAdaptersIntegration(unittest.TestCase):
         toast = Toast(parent)
         
         # Test des types acceptés
-        for kind in ["success", "danger", "warning"]:
+        for kind in ["success", "danger", "warning", "info"]:
             # Ne pas afficher réellement, juste vérifier que ça ne plante pas
             try:
                 toast.popup(kind, "Test Title", "Test message", msecs=1)
             except:
                 pass
         
-        # Test que 'error' est rejeté
-        with self.assertRaises(ValueError):
-            toast.popup("error", "Test", "Test")
+        # Test que 'error' est accepté comme synonyme de 'danger'
+        try:
+            toast.popup("error", "Test", "Test", msecs=1)
+        except ValueError:
+            self.fail("'error' devrait être accepté comme synonyme de 'danger'")
 
 
 if __name__ == "__main__":

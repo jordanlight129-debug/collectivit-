@@ -59,7 +59,7 @@ class ImputationPureTest(unittest.TestCase):
             cm.build_statement(14000, M2026, M2026, 0, carried_debt=-1)
 
     def test_funeraire_la_cotisation_en_cours_d_abord(self):
-        membre = Membre(1, "001", "Test", Sexe.HOMME, ANCIEN, "actif", None)
+        membre = Membre(1, "0001", "Test", Sexe.HOMME, ANCIEN, "actif", None)
         deaths = [Deces(1, 1, "D1", PARENT, None, date(2026, 10, 3), 10000, 8000, None, False),
                   Deces(2, 1, "D2", PARENT, None, date(2026, 11, 10), 10000, 8000, None, False)]
         s = cotisation_funeraire.build_statement(membre, deaths, 35000, carried_debt=30000)
@@ -68,7 +68,7 @@ class ImputationPureTest(unittest.TestCase):
                          (20000, 35000, 15000, 30000, 30000))
 
     def test_funeraire_les_arrieres_se_reglent_par_un_paiement_explicite(self):
-        membre = Membre(1, "001", "Test", Sexe.HOMME, ANCIEN, "actif", None)
+        membre = Membre(1, "0001", "Test", Sexe.HOMME, ANCIEN, "actif", None)
         deaths = [Deces(1, 1, "D1", PARENT, None, date(2026, 10, 3), 10000, 8000, None, False),
                   Deces(2, 1, "D2", PARENT, None, date(2026, 11, 10), 10000, 8000, None, False)]
         s = cotisation_funeraire.build_statement(membre, deaths, 5000, carried_debt=30000, arrears_paid=20000)

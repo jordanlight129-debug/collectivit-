@@ -8,6 +8,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 
 from app.database.connection import transaction
 from app.models.depense import Depense, DepenseLigne, ReliquatLigne
@@ -23,9 +24,9 @@ class DepenseError(Exception):
 
 @dataclass(frozen=True)
 class TotauxDepenses:
-    prevu: int
-    depense: int
-    reliquat: int
+    prevu: Decimal
+    depense: Decimal
+    reliquat: Decimal
 
 
 @dataclass(frozen=True)
@@ -36,22 +37,26 @@ class PageDepenses:
     general: TotauxDepenses   # totaux de tout le résultat filtré
 
 
-def _fmt(amount: int) -> str:
-    return f"{amount:,}".replace(",", "\u00A0") + " FCFA"
+def _fmt(amount: int | Decimal) -> str:
+    return f"{amount:,.0f}".replace(",", "\u00A0") + " FCFA"
 
 
 def _d(value: date) -> str:
     return value.strftime("%d/%m/%Y")
 
 
-def _check_montant(value, label: str) -> None:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+def _check_montant(value: int | Decimal, label: str) -> Decimal:
+    if isinstance(value, bool) or isinstance(value, float) or not isinstance(value, (int, Decimal)):
         raise DepenseError(f"{label} : entrez un montant entier positif ou nul (en FCFA).")
+    amount = Decimal(value)
+    if not amount.is_finite() or amount < 0 or amount != amount.to_integral_value():
+        raise DepenseError(f"{label} : entrez un montant entier positif ou nul (en FCFA).")
+    return amount
 
 
 def enregistrer_depense(conn: sqlite3.Connection, session: Session, libelle: str,
-                        montant_depense: int, beneficiaire: str | None = None,
-                        montant_prevu: int | None = None, date_depense: date | None = None,
+                        montant_depense: int | Decimal, beneficiaire: str | None = None,
+                        montant_prevu: int | Decimal | None = None, date_depense: date | None = None,
                         today: date | None = None) -> Depense:
     """Enregistre une dépense. Sans montant prévu, le prévu est égal au dépensé."""
     session.require(Permission.EXPENSE_CREATE)
@@ -64,11 +69,11 @@ def enregistrer_depense(conn: sqlite3.Connection, session: Session, libelle: str
     beneficiaire = " ".join((beneficiaire or "").split()) or None
     if beneficiaire and len(beneficiaire) > 100:
         raise DepenseError("Le bénéficiaire est trop long (100 caractères maximum).")
-    _check_montant(montant_depense, "Montant dépensé")
+    montant_depense = _check_montant(montant_depense, "Montant dépensé")
     if montant_prevu is None:
         montant_prevu = montant_depense
     else:
-        _check_montant(montant_prevu, "Montant prévu")
+        montant_prevu = _check_montant(montant_prevu, "Montant prévu")
     if montant_prevu == 0 and montant_depense == 0:
         raise DepenseError("Au moins un des deux montants doit être supérieur à 0.")
     date_depense = date_depense or today
@@ -83,7 +88,7 @@ def enregistrer_depense(conn: sqlite3.Connection, session: Session, libelle: str
     if not exercice.is_open:
         raise DepenseError(f"L'exercice {exercice.libelle} est clôturé : on ne peut plus y ajouter de dépense.")
 
-    reliquat = max(montant_prevu - montant_depense, 0)
+    reliquat = max(montant_prevu - montant_depense, Decimal(0))
     with transaction(conn):
         depense_id = depenses.create(conn, exercice.id, date_depense, libelle, beneficiaire,
                                      montant_prevu, montant_depense, session.user.id)
@@ -125,9 +130,9 @@ def lister_depenses(conn: sqlite3.Connection, exercice_id: int, *, search: str |
     lignes = depenses.list_(conn, exercice_id, search=search, date_debut=date_debut,
                             date_fin=date_fin, avec_reliquat=avec_reliquat, limit=limit, offset=offset)
     page = TotauxDepenses(
-        prevu=sum(l.depense.montant_prevu for l in lignes),
-        depense=sum(l.depense.montant_depense for l in lignes),
-        reliquat=sum(l.reliquat.montant for l in lignes if l.reliquat),
+        prevu=sum((l.depense.montant_prevu for l in lignes), Decimal(0)),
+        depense=sum((l.depense.montant_depense for l in lignes), Decimal(0)),
+        reliquat=sum((l.reliquat.montant for l in lignes if l.reliquat), Decimal(0)),
     )
     general = TotauxDepenses(*depenses.totals(conn, exercice_id, search=search, date_debut=date_debut,
                                               date_fin=date_fin, avec_reliquat=avec_reliquat))

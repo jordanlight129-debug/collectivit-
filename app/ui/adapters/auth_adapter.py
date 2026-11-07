@@ -6,7 +6,8 @@ from datetime import datetime
 
 from app.database.connection import get_connection
 from app.security.session import Session
-from app.services.auth_service import login, AuthError, InvalidCredentials, AccountLocked, AccountDisabled
+from app.services.auth_service import login, logout, AuthError, InvalidCredentials, AccountLocked, AccountDisabled
+from app.services.user_service import changer_mon_mot_de_passe
 from app.ui.ports import LoginResult, LoginStatus, UserInfo, Role
 
 
@@ -26,7 +27,7 @@ class AuthAdapter:
                 UserInfo(
                     current_user.identifiant,
                     current_user.nom_complet,
-                    current_user.role
+                    current_user.role.value
                 )
             )
         except InvalidCredentials as e:
@@ -39,6 +40,23 @@ class AuthAdapter:
             return LoginResult(LoginStatus.REFUSED, message=str(e))
         except Exception as e:
             return LoginResult(LoginStatus.REFUSED, message=f"Erreur : {e}")
+
+    def logout(self) -> None:
+        """Déconnecte l'utilisateur courant."""
+        try:
+            conn = get_connection()
+            logout(conn, self._session)
+            conn.close()
+        except Exception:
+            # En cas d'erreur, on déconnecte quand même la session locale
+            self._session.logout()
+
+    def change_password(self, current_password: str, new_password: str) -> None:
+        conn = get_connection()
+        try:
+            changer_mon_mot_de_passe(conn, self._session, current_password, new_password)
+        finally:
+            conn.close()
 
     @property
     def session(self) -> Session:

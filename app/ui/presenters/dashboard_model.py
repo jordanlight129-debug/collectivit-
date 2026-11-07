@@ -17,6 +17,7 @@ from app.ui.widgets.badge import Kind
 _NBSP = "\u00a0"
 _STATUTS = {
     "paye": ("Payé", Kind.SUCCESS),
+    "enregistree": ("Enregistrée", Kind.NEUTRAL),
     "partiel": ("Partiel", Kind.WARNING),
     "attente": ("En attente", Kind.WARNING),
     "reliquat": ("Reliquat", Kind.INFO),
@@ -153,7 +154,7 @@ def build_view_model(data: DashboardData) -> DashboardViewModel:
         )
     )
 
-    affiches = data.debtors[:5]
+    affiches = sorted(data.debtors, key=lambda debiteur: debiteur.amount, reverse=True)[:4]
     return DashboardViewModel(
         subtitle=(f"Synthèse de l’exercice {data.exercise_label} · montants en FCFA "
                   f"(encaissé réel uniquement)"),

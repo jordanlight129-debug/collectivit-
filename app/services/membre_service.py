@@ -60,7 +60,7 @@ def get_membre(conn: sqlite3.Connection, membre_id: int) -> Membre | None:
 
 
 def get_by_carnet(conn: sqlite3.Connection, numero_carnet: str) -> Membre | None:
-    return membres.get_by_carnet(conn, numero_carnet.strip().upper())
+    return membres.get_by_carnet(conn, carnet_service.valider_carnet(numero_carnet))
 
 
 def list_membres(conn: sqlite3.Connection, *, search: str | None = None,
@@ -87,7 +87,7 @@ def create_membre(conn: sqlite3.Connection, session: Session, nom: str, sexe: Se
         with transaction(conn):
             carnet = carnet_service.allocate(conn)
             membre_id = membres.create(conn, carnet, nom, sexe, adhesion)
-            audit.log(conn, session.user, Action.MEMBRE_AJOUT, f"Carnet {carnet}",
+            audit.log(conn, session.user, Action.MEMBRE_AJOUT, carnet_service.format_carnet_label(carnet),
                       _resume(nom, sexe, adhesion))
     except sqlite3.IntegrityError:
         raise MembreError("Impossible d'attribuer un numéro de carnet. Réessayez.") from None
@@ -119,7 +119,7 @@ def update_membre(conn: sqlite3.Connection, session: Session, membre_id: int, no
     with transaction(conn):
         membres.update(conn, membre_id, nom, sexe, adhesion)
         if changes:
-            audit.log(conn, session.user, Action.MEMBRE_MODIF, f"Carnet {membre.numero_carnet}",
+            audit.log(conn, session.user, Action.MEMBRE_MODIF, carnet_service.format_carnet_label(membre.numero_carnet),
                       " · ".join(changes))
     return membres.get(conn, membre_id)
 
@@ -143,7 +143,7 @@ def declare_deceased(conn: sqlite3.Connection, session: Session, membre_id: int,
 
     with transaction(conn):
         membres.set_deceased(conn, membre_id, date_deces)
-        audit.log(conn, session.user, Action.MEMBRE_DECES, f"Carnet {membre.numero_carnet}",
+        audit.log(conn, session.user, Action.MEMBRE_DECES, carnet_service.format_carnet_label(membre.numero_carnet),
                   f"{membre.nom} · décès le {_d(date_deces)}")
     return membres.get(conn, membre_id)
 
@@ -157,7 +157,7 @@ def delete_membre(conn: sqlite3.Connection, session: Session, membre_id: int) ->
     try:
         with transaction(conn):
             membres.delete(conn, membre_id)
-            audit.log(conn, session.user, Action.MEMBRE_SUPPR, f"Carnet {membre.numero_carnet}",
+            audit.log(conn, session.user, Action.MEMBRE_SUPPR, carnet_service.format_carnet_label(membre.numero_carnet),
                       membre.nom)
     except sqlite3.IntegrityError:
         raise MembreError(

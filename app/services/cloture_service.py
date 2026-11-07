@@ -165,7 +165,7 @@ def _reports(conn: sqlite3.Connection, exercice: Exercice) -> tuple[int, dict]:
         solde = bilan_service.calculer(conn, exercice.id).solde_cumule
     except (TableauError, TableauFuneraireError, BilanError) as exc:
         raise ClotureError(str(exc)) from None
-    return solde, cumul
+    return int(solde), cumul
 
 
 def apercu(conn: sqlite3.Connection, session: Session, exercice_id: int,

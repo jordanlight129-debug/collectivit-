@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Protocol
 
 
@@ -10,7 +11,7 @@ class LeftoverRecord:
     id: int
     name: str
     expense_label: str
-    amount: int
+    amount: Decimal
     date: str
 
 
@@ -19,7 +20,7 @@ class LeftoversData:
     exercise_label: str
     is_open: bool
     records: tuple[LeftoverRecord, ...]
-    total: int
+    total: Decimal
 
 
 class LeftoversPort(Protocol):

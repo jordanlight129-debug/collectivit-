@@ -18,6 +18,7 @@ class FinesPresenter(QObject):
         self._data: FinesData | None = None
         self._query = FinesQuery()
         view.search_changed.connect(lambda t: self._changer(search=t, page=1))
+        view.status_changed.connect(lambda status: self._changer(status=status, page=1))
         view.sort_requested.connect(self._trier)
         view.page_requested.connect(lambda p: self._changer(page=p))
 

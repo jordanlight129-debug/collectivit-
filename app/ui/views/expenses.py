@@ -68,6 +68,8 @@ class ExpensesView(QWidget):
         corps.addStretch(1)
 
         self._row_count = 0
+        self._model: ExpensesViewModel | None = None
+        self._can_delete = False
         self.search.textChanged.connect(self.search_changed.emit)
         self._find = QShortcut(QKeySequence(QKeySequence.StandardKey.Find), self)
         self._find.activated.connect(self.focus_search)
@@ -131,17 +133,40 @@ class ExpensesView(QWidget):
         self.search.selectAll()
 
     def set_model(self, model: ExpensesViewModel) -> None:
+        self._model = model
         self.header.set_subtitle(model.subtitle)
         self.total_planned_label.setText(model.total_planned)
         self.total_spent_label.setText(model.total_spent)
+        self.add_button.setEnabled(not model.read_only)
+        self.add_button.setToolTip("Exercice clôturé : saisie impossible" if model.read_only else "")
         self._fill_table(model)
         self.counter.setText(model.counter)
         self._fill_pager(model)
 
+    def set_error(self, message: str) -> None:
+        self._model = None
+        self.header.set_subtitle("")
+        self.total_planned_label.setText("—")
+        self.total_spent_label.setText("—")
+        self.add_button.setEnabled(False)
+        self.add_button.setToolTip(message)
+        _clear_layout(self._grid)
+        self.error_label = make_label(message, "caption", wrap=True)
+        self.error_label.setContentsMargins(_PAD, 20, _PAD, 20)
+        self._grid.addWidget(self.error_label, 0, 0, 1, _COLONNE_ACTIONS + 1)
+        _clear_layout(self._pager)
+        self.counter.setText("")
+        self._row_count = 0
+
+    def set_can_delete(self, can_delete: bool) -> None:
+        self._can_delete = can_delete
+        if self._model is not None:
+            self._fill_table(self._model)
+
     def _fill_table(self, model: ExpensesViewModel) -> None:
         _clear_layout(self._grid)
         for colonne, (cle, titre, _poids, droite) in enumerate(_COLONNES):
-            fleche = (" ▲" if model.rows and model.rows[0] else "") if cle == "date" else ""
+            fleche = (" ▲" if model.ascending else " ▼") if cle == model.sort_key else ""
             self._grid.addWidget(self._entete(cle, titre + fleche, colonne, droite), 0, colonne)
         self._grid.addWidget(self._entete("", "", _COLONNE_ACTIONS, False, cliquable=False),
                              0, _COLONNE_ACTIONS)
@@ -200,6 +225,8 @@ class ExpensesView(QWidget):
         self._grid.addWidget(self._cellule(e.amount_spent, "grid-total", 4, True, couleur_spent), ligne, 4)
         actions = AppButton("•••", Variant.LINK)
         actions.setFixedWidth(40)
+        actions.setVisible(self._can_delete)
+        actions.setEnabled(not self._model.read_only if self._model is not None else False)
         actions.clicked.connect(lambda _=False, i=e.id: self.expense_action_requested.emit(i))
         self._grid.addWidget(actions, ligne, _COLONNE_ACTIONS,
                              Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -207,11 +234,12 @@ class ExpensesView(QWidget):
     def _fill_pager(self, model: ExpensesViewModel) -> None:
         _clear_layout(self._pager)
         precedent = AppButton("Précédent", Variant.SECONDARY)
-        precedent.setEnabled(bool(model.rows and len(model.rows) > 0))
-        precedent.clicked.connect(lambda: self.page_requested.emit(1))
+        precedent.setEnabled(model.page > 1)
+        precedent.clicked.connect(lambda: self.page_requested.emit(model.page - 1))
         self._pager.addWidget(precedent)
-        self._pager.addWidget(make_label("Pagination à implémenter", "caption"))
         suivant = AppButton("Suivant", Variant.SECONDARY)
-        suivant.setEnabled(bool(model.rows and len(model.rows) > 0))
-        suivant.clicked.connect(lambda: self.page_requested.emit(2))
+        suivant.setEnabled(model.page < model.page_count)
+        suivant.clicked.connect(lambda: self.page_requested.emit(model.page + 1))
+        self.previous_button = precedent
+        self.next_button = suivant
         self._pager.addWidget(suivant)

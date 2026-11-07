@@ -7,8 +7,8 @@ from datetime import date
 from app.database.connection import get_connection
 from app.repositories import membres, exercices
 from app.services.tableau_mensuel import tableau as tableau_mensuel
-from app.services.membre_service import create_membre
-from app.security.session import Session, CurrentUser, Role
+from app.services.membre_service import create_membre, update_membre, delete_membre, declare_deceased, MembreError
+from app.security.session import Session
 from app.ui.ports_members import MemberInfo, MembersData, MemberStatus
 
 
@@ -16,7 +16,11 @@ class MembersAdapter:
     """Implémente MembersPort en utilisant les services."""
 
     def __init__(self) -> None:
-        pass
+        self._session = Session()
+
+    def _require_session(self) -> None:
+        if not self._session.is_authenticated:
+            raise PermissionError("Veuillez vous connecter.")
 
     def load(self, exercise_label: str) -> MembersData:
         conn = get_connection()
@@ -59,6 +63,7 @@ class MembersAdapter:
 
                 members_info.append(MemberInfo(
                     m.numero_carnet,
+                    m.id,
                     m.nom,
                     m.sexe.value,
                     m.date_adhesion,
@@ -78,23 +83,78 @@ class MembersAdapter:
 
     def add_member(self, nom: str, sexe: str, date_adhesion: str) -> int:
         """Ajoute un nouveau membre."""
+        self._require_session()
         from app.models.sexe import Sexe
         conn = get_connection()
         try:
-            # Créer une session temporaire pour l'ajout
-            session = Session()
-            session.login(CurrentUser(1, "admin", "Administrateur", Role.ADMINISTRATEUR))
-
-            # Convertir la date
             adhesion_date = date.fromisoformat(date_adhesion)
             sexe_enum = Sexe.HOMME if sexe == "M" else Sexe.FEMME
 
-            # Créer le membre
-            membre_id = create_membre(conn, session, nom, sexe_enum, adhesion_date)
+            membre = create_membre(conn, self._session, nom, sexe_enum, adhesion_date)
 
             conn.commit()
             conn.close()
-            return membre_id
+            return membre.id
+        except MembreError as e:
+            conn.close()
+            raise e
         except Exception as e:
             conn.close()
             raise Exception(f"Erreur lors de l'ajout du membre: {e}")
+
+    def update_member(self, membre_id: int, nom: str, date_adhesion: str) -> None:
+        """Modifie un membre existant."""
+        self._require_session()
+        conn = get_connection()
+        try:
+            # Récupérer le membre pour obtenir son sexe (non modifiable)
+            membre = membres.get(conn, membre_id)
+            if not membre:
+                raise MembreError("Membre introuvable")
+
+            adhesion_date = date.fromisoformat(date_adhesion)
+
+            update_membre(conn, self._session, membre_id, nom, membre.sexe, adhesion_date)
+
+            conn.commit()
+            conn.close()
+        except MembreError as e:
+            conn.close()
+            raise e
+        except Exception as e:
+            conn.close()
+            raise Exception(f"Erreur lors de la modification du membre: {e}")
+
+    def delete_member(self, membre_id: int) -> None:
+        """Supprime un membre (admin uniquement)."""
+        self._require_session()
+        conn = get_connection()
+        try:
+            delete_membre(conn, self._session, membre_id)
+
+            conn.commit()
+            conn.close()
+        except MembreError as e:
+            conn.close()
+            raise e
+        except Exception as e:
+            conn.close()
+            raise Exception(f"Erreur lors de la suppression du membre: {e}")
+
+    def declare_deceased(self, membre_id: int, date_deces: str) -> None:
+        """Déclare un membre décédé."""
+        self._require_session()
+        conn = get_connection()
+        try:
+            deces_date = date.fromisoformat(date_deces)
+
+            declare_deceased(conn, self._session, membre_id, deces_date)
+
+            conn.commit()
+            conn.close()
+        except MembreError as e:
+            conn.close()
+            raise e
+        except Exception as e:
+            conn.close()
+            raise Exception(f"Erreur lors de la déclaration de décès: {e}")

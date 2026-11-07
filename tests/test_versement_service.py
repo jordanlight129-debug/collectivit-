@@ -40,7 +40,7 @@ class VersementServiceTest(unittest.TestCase):
         v = svc.enregistrer(self.conn, self.sec, self.yawo.id, self.ex.id, svc.MENSUELLE, 5000, today=TODAY)
         self.assertEqual((v.montant, v.date_versement, v.rubrique, v.cree_par), (5000, TODAY, "mensuelle", 2))
         e = audit.list_entries(self.conn)[0]
-        self.assertEqual((e["action"], e["objet"], e["identifiant"]), (Action.VERSEMENT_AJOUT, "Carnet 001", "yawa"))
+        self.assertEqual((e["action"], e["objet"], e["identifiant"]), (Action.VERSEMENT_AJOUT, "Carnet 0001", "yawa"))
 
     def test_releve_de_yawo_dette_de_85000(self):
         self._pay(self.yawo, 100000)

@@ -13,7 +13,7 @@ from app.repositories import cotisations_paralleles, exercices, membres, reports
 from app.security import audit
 from app.security.audit import Action
 from app.security.session import Permission, Session
-from app.services import cotisation_mensuelle
+from app.services import carnet_service, cotisation_mensuelle
 from app.services.regles import concerned_by_parallel
 
 
@@ -101,7 +101,7 @@ def enregistrer(conn: sqlite3.Connection, session: Session, membre_id: int, exer
         versement_id = versements.add(conn, membre.id, exercice.id, rubrique, date_versement,
                                       montant, note, session.user.id,
                                       cotisation.id if cotisation else None)
-        audit.log(conn, session.user, Action.VERSEMENT_AJOUT, f"Carnet {membre.numero_carnet}",
+        audit.log(conn, session.user, Action.VERSEMENT_AJOUT, carnet_service.format_carnet_label(membre.numero_carnet),
                   f"{_fmt(montant)} · {libelle} · {_d(date_versement)} · exercice {exercice.libelle}")
     return versements.get(conn, versement_id)
 
@@ -125,7 +125,7 @@ def modifier(conn: sqlite3.Connection, session: Session, versement_id: int, mont
 
     with transaction(conn):
         versements.update(conn, versement_id, montant, date_versement, note)
-        audit.log(conn, session.user, Action.VERSEMENT_MODIF, f"Carnet {membre.numero_carnet}",
+        audit.log(conn, session.user, Action.VERSEMENT_MODIF, carnet_service.format_carnet_label(membre.numero_carnet),
                   f"{_fmt(ancien.montant)} du {_d(ancien.date_versement)} → "
                   f"{_fmt(montant)} du {_d(date_versement)} · exercice {exercice.libelle}")
     return versements.get(conn, versement_id)
@@ -141,7 +141,7 @@ def supprimer(conn: sqlite3.Connection, session: Session, versement_id: int) -> 
     membre = membres.get(conn, versement.membre_id)
     with transaction(conn):
         versements.delete(conn, versement_id)
-        audit.log(conn, session.user, Action.VERSEMENT_SUPPR, f"Carnet {membre.numero_carnet}",
+        audit.log(conn, session.user, Action.VERSEMENT_SUPPR, carnet_service.format_carnet_label(membre.numero_carnet),
                   f"{_fmt(versement.montant)} du {_d(versement.date_versement)} · "
                   f"{RUBRIQUE_LABELS[versement.rubrique]} · exercice {exercice.libelle}")
 

@@ -55,13 +55,14 @@ def _marges(colonne: int) -> tuple[int, int]:
 
 class MembersView(QWidget):
     export_requested = Signal()
+    export_excel_requested = Signal()
     add_requested = Signal()
     search_changed = Signal(str)
     status_changed = Signal(str)
     sex_changed = Signal(str)
     sort_requested = Signal(str)
     page_requested = Signal(int)
-    member_action_requested = Signal(str)        # n° de carnet
+    member_action_requested = Signal(int, str)   # id, n° de carnet
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -71,9 +72,11 @@ class MembersView(QWidget):
         corps.setSpacing(Layout.SECTION_GAP)
 
         self.header = PageHeader("Membres", "")
-        self.export_button = AppButton("Exporter", Variant.SECONDARY, "file")
+        self.export_button = AppButton("Exporter PDF", Variant.SECONDARY, "file")
+        self.export_excel_button = AppButton("Exporter Excel", Variant.SECONDARY)
         self.add_button = AppButton("Ajouter un membre", Variant.PRIMARY, "plus")
         self.header.add_action(self.export_button)
+        self.header.add_action(self.export_excel_button)
         self.header.add_action(self.add_button)
         corps.addWidget(self.header)
 
@@ -84,6 +87,7 @@ class MembersView(QWidget):
 
         self._row_count = 0
         self.export_button.clicked.connect(lambda: self.export_requested.emit())
+        self.export_excel_button.clicked.connect(lambda: self.export_excel_requested.emit())
         self.add_button.clicked.connect(lambda: self.add_requested.emit())
         self.search.textChanged.connect(self.search_changed.emit)
         self.status_combo.currentIndexChanged.connect(
@@ -230,7 +234,7 @@ class MembersView(QWidget):
         actions = AppButton("•••", Variant.LINK)
         actions.setToolTip(f"Actions pour {m.name}")
         actions.setFixedWidth(40)
-        actions.clicked.connect(lambda _=False, c=m.carnet: self.member_action_requested.emit(c))
+        actions.clicked.connect(lambda _=False, id=m.id, carnet=m.carnet: self.member_action_requested.emit(id, carnet))
         self._grid.addWidget(actions, ligne, _COLONNE_ACTIONS,
                              Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 

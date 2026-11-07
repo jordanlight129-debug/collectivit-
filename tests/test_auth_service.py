@@ -24,6 +24,7 @@ class AuthServiceTest(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.conn = sqlite3.connect(":memory:")
         self.conn.row_factory = sqlite3.Row
+        self.addCleanup(self.conn.close)
         migrate(self.conn)
         self.session = Session()
         auth.create_first_admin(self.conn, "ama", "Ama Kpodar", "Secret2026")
@@ -44,6 +45,7 @@ class AuthServiceTest(unittest.TestCase):
     def test_mot_de_passe_faible_refuse(self):
         c = sqlite3.connect(":memory:")
         c.row_factory = sqlite3.Row
+        self.addCleanup(c.close)
         migrate(c)
         with self.assertRaises(PasswordPolicyError):
             auth.create_first_admin(c, "ama", "Ama", "court")
@@ -57,10 +59,10 @@ class AuthServiceTest(unittest.TestCase):
                 self._login("ama", "faux")
         with self.assertRaises(AccountLocked):            # 5e échec
             self._login("ama", "faux")
-        with self.assertRaises(AccountLocked):            # même avec le bon mot de passe
-            self._login("ama", "Secret2026", now=T0 + timedelta(minutes=1))
+        with self.assertRaises(AccountLocked):            # même avec le bon mot de passe (verrou de 30s)
+            self._login("ama", "Secret2026", now=T0 + timedelta(seconds=20))
         self.assertFalse(self.session.is_authenticated)
-        self._login("ama", "Secret2026", now=T0 + timedelta(minutes=6))
+        self._login("ama", "Secret2026", now=T0 + timedelta(seconds=31))  # après expiration du verrou
         self.assertTrue(self.session.is_authenticated)
 
     def test_identifiant_inconnu_meme_message(self):
@@ -81,6 +83,22 @@ class AuthServiceTest(unittest.TestCase):
         auth.logout(self.conn, self.session)
         self.assertFalse(self.session.is_authenticated)
         self.assertEqual(audit.list_entries(self.conn)[0]["action"], audit.Action.DECONNEXION)
+
+    def test_verrouillage_apres_5_echecs_non_regression(self):
+        """Test de non-régression : le verrouillage doit persister après 5 échecs."""
+        # 5 échecs consécutifs
+        for _ in range(5):
+            with self.assertRaises((InvalidCredentials, AccountLocked)):
+                self._login("ama", "faux")
+        # Le compte doit être verrouillé, même avec le bon mot de passe
+        with self.assertRaises(AccountLocked):
+            self._login("ama", "Secret2026", now=T0 + timedelta(seconds=10))
+        # Le compteur d'échecs doit avoir été remis à zéro après verrouillage
+        # Une nouvelle tentative échouée ne doit pas re-verrouiller immédiatement
+        # (le compteur a été remis à 0 par record_failure avec 0)
+        with self.assertRaises(InvalidCredentials) as ctx:
+            self._login("ama", "faux", now=T0 + timedelta(seconds=31))
+        self.assertEqual(ctx.exception.remaining, 4)  # 1 échec sur 5 autorisés
 
 
 if __name__ == "__main__":

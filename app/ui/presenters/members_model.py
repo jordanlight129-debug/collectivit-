@@ -30,6 +30,7 @@ class MembersQuery:
 
 @dataclass(frozen=True)
 class MemberRow:
+    id: int
     carnet: str
     name: str
     sex: str
@@ -117,7 +118,7 @@ def _numeros_pages(page: int, pages: int) -> tuple[int, ...]:
 def _ligne(m: MemberInfo) -> MemberRow:
     texte, genre = _STATUT_TEXTE.get(m.status, (m.status, Kind.NEUTRAL))
     d, a = dette(m), avance(m)
-    return MemberRow(m.carnet, m.name, m.sex, format_date(m.joined_on), texte, genre,
+    return MemberRow(m.id, m.carnet, m.name, m.sex, format_date(m.joined_on), texte, genre,
                      _nombre(m.du), _nombre(m.recu), _montant(d), _montant(a),
                      m.status == MemberStatus.DECEDE, d > 0, a > 0)
 

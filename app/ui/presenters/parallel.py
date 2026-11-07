@@ -20,6 +20,8 @@ class ParallelPresenter(QObject):
         view.search_changed.connect(lambda t: self._changer(search=t, page=1))
         view.sort_requested.connect(self._trier)
         view.page_requested.connect(lambda p: self._changer(page=p))
+        view.subscription_action_requested.connect(
+            lambda subscription_id: self._changer(selected_subscription_id=subscription_id))
 
     def show_exercise(self, exercise_label: str) -> None:
         self._data = self._port.load(exercise_label)

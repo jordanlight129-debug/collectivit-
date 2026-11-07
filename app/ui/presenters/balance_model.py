@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 
 @dataclass(frozen=True)
@@ -17,8 +18,8 @@ class BalanceViewModel:
     is_positive: bool
 
 
-def _format_amount(amount: int) -> str:
-    return f"{amount:,}".replace(",", " ")
+def _format_amount(amount: int | Decimal) -> str:
+    return f"{amount:,.0f}".replace(",", " ")
 
 
 def build_view_model(data) -> BalanceViewModel:

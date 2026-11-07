@@ -36,13 +36,13 @@ class FormField(QFrame):
         
         # Connecter le signal de changement si disponible
         if hasattr(widget, 'textChanged'):
-            widget.textChanged.connect(self.value_changed.emit)
+         widget.textChanged.connect(lambda *_: self.value_changed.emit())
         elif hasattr(widget, 'currentIndexChanged'):
-            widget.currentIndexChanged.connect(self.value_changed.emit)
+         widget.currentIndexChanged.connect(lambda *_: self.value_changed.emit())
         elif hasattr(widget, 'dateChanged'):
-            widget.dateChanged.connect(self.value_changed.emit)
+          widget.dateChanged.connect(lambda *_: self.value_changed.emit())
         elif hasattr(widget, 'valueChanged'):
-            widget.valueChanged.connect(self.value_changed.emit)
+          widget.valueChanged.connect(lambda *_: self.value_changed.emit())
     
     def input_widget(self) -> QWidget | None:
         return self._input
@@ -156,11 +156,23 @@ class SelectInput(FormField):
 
 class TextArea(FormField):
     """Zone de texte multiligne."""
-    
+
     def __init__(self, label: str, required: bool = False, placeholder: str = "",
                  max_length: int = 500, parent: QWidget | None = None) -> None:
         super().__init__(label, required, parent)
         self.input_widget = QTextEdit()
         self.input_widget.setPlaceholderText(placeholder)
         self.input_widget.setMaximumHeight(100)
+        self.set_input(self.input_widget)
+
+
+class ReadOnlyInput(FormField):
+    """Champ en lecture seule (non modifiable)."""
+
+    def __init__(self, label: str, parent: QWidget | None = None) -> None:
+        super().__init__(label, required=False, parent=parent)
+        self.input_widget = QLineEdit()
+        self.input_widget.setReadOnly(True)
+        self.input_widget.setFixedHeight(Layout.INPUT_HEIGHT)
+        self.input_widget.setStyleSheet(f"background: {Color.GRAY_100};")
         self.set_input(self.input_widget)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Protocol
 
 
@@ -12,10 +13,10 @@ class BalanceData:
     period_start: str
     period_end: str
     total_revenue: int
-    total_expenses: int
-    balance: int
+    total_expenses: Decimal
+    balance: Decimal
     carried_forward: int
-    closing_balance: int
+    closing_balance: Decimal
 
 
 class BalancePort(Protocol):

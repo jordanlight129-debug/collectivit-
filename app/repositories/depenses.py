@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date
+from decimal import Decimal
 
 from app.models.depense import Depense, DepenseLigne, Reliquat
 
@@ -10,13 +11,13 @@ _FROM = "FROM depenses d LEFT JOIN reliquats r ON r.depense_id = d.id"
 
 
 def create(conn: sqlite3.Connection, exercice_id: int, date_depense: date, libelle: str,
-           beneficiaire: str | None, montant_prevu: int, montant_depense: int,
+           beneficiaire: str | None, montant_prevu: Decimal, montant_depense: Decimal,
            cree_par: int | None) -> int:
     cur = conn.execute(
         "INSERT INTO depenses (exercice_id, date_depense, libelle, beneficiaire, "
         "montant_prevu, montant_depense, cree_par) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (exercice_id, date_depense.isoformat(), libelle, beneficiaire, montant_prevu,
-         montant_depense, cree_par),
+        (exercice_id, date_depense.isoformat(), libelle, beneficiaire, int(montant_prevu),
+         int(montant_depense), cree_par),
     )
     return int(cur.lastrowid)
 
@@ -66,7 +67,7 @@ def list_(conn: sqlite3.Connection, exercice_id: int, *, search: str | None = No
         reliquat = None
         if row["r_id"] is not None:
             reliquat = Reliquat(row["r_id"], row["exercice_id"], row["id"], row["r_nom"],
-                                row["r_montant"], date.fromisoformat(row["r_date"]))
+                                Decimal(str(row["r_montant"])), date.fromisoformat(row["r_date"]))
         lignes.append(DepenseLigne(Depense.from_row(row), reliquat))
     return lignes
 
@@ -80,7 +81,7 @@ def count(conn: sqlite3.Connection, exercice_id: int, *, search: str | None = No
 
 def totals(conn: sqlite3.Connection, exercice_id: int, *, search: str | None = None,
            date_debut: date | None = None, date_fin: date | None = None,
-           avec_reliquat: bool | None = None) -> tuple[int, int, int]:
+           avec_reliquat: bool | None = None) -> tuple[Decimal, Decimal, Decimal]:
     """(prévu, dépensé, reliquats)."""
     where, params = _where(exercice_id, search, date_debut, date_fin, avec_reliquat)
     row = conn.execute(
@@ -88,4 +89,4 @@ def totals(conn: sqlite3.Connection, exercice_id: int, *, search: str | None = N
         f"COALESCE(SUM(r.montant), 0) {_FROM}{where}",
         params,
     ).fetchone()
-    return int(row[0]), int(row[1]), int(row[2])
+    return tuple(Decimal(str(value)) for value in row)

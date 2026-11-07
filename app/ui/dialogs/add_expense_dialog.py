@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from PySide6.QtWidgets import QWidget
 
@@ -40,7 +41,7 @@ class AddExpenseDialog(FormDialog):
         return {
             "libelle": self.label_field.value(),
             "beneficiaire": self.beneficiary_field.value() or None,
-            "montant_prevu": int(self.planned_field.value()),
-            "montant_depense": int(self.spent_field.value()),
+            "montant_prevu": Decimal(self.planned_field.value()),
+            "montant_depense": Decimal(self.spent_field.value()),
             "date_depense": self.date_field.value(),
         }

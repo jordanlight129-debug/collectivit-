@@ -51,13 +51,16 @@ _TOAST_ICONS = {
     "success": ("check", Color.SUCCESS_600),
     "danger": ("alert", Color.DANGER_600),
     "warning": ("alert", Color.WARNING_600),
+    "info": ("info", Color.NAVY_700),
 }
+# « error » est accepté comme synonyme de « danger » (utilisé dans main_window)
+_TOAST_ALIAS = {"error": "danger"}
 _TOAST_WIDTH = 460
 _TOAST_MARGIN = 24
 
 
 class Toast(QFrame):
-    """Message temporaire en bas à droite de la fenêtre parente (succès, erreur, avertissement)."""
+    """Message temporaire en bas à droite de la fenêtre parente (succès, erreur, avertissement, info)."""
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
@@ -70,7 +73,7 @@ class Toast(QFrame):
         self._icon.setFixedSize(20, 20)
         colonne = QVBoxLayout()
         colonne.setSpacing(2)
-        self._title = make_label("", "toast-title")
+        self._title = make_label("", "toast-title", wrap=True)
         self._text = make_label("", "toast-text", wrap=True)
         colonne.addWidget(self._title)
         colonne.addWidget(self._text)
@@ -87,10 +90,15 @@ class Toast(QFrame):
     def title_text(self) -> str:
         return self._title.text()
 
-    def popup(self, kind: str, title: str, text: str = "", msecs: int = 2500) -> None:
+    def popup(self, kind: str, title: str, text: str = "", msecs: int | None = None) -> None:
         """Affiche le message puis le masque seul après `msecs` ms (clic pour le fermer avant)."""
+        kind = _TOAST_ALIAS.get(kind, kind)
         if kind not in _TOAST_ICONS:
             raise ValueError(f"Genre de message inconnu : {kind}")
+        parent = self.parentWidget()
+        if parent is not None:
+            largeur_disponible = max(parent.width() - 2 * _TOAST_MARGIN, 1)
+            self.setFixedWidth(min(_TOAST_WIDTH, largeur_disponible))
         self.kind = kind
         nom, couleur = _TOAST_ICONS[kind]
         self._icon.setPixmap(icons.icon(nom, couleur, 20).pixmap(20, 20))
@@ -103,6 +111,8 @@ class Toast(QFrame):
         self._place()
         self.raise_()
         self.show()
+        if msecs is None:
+            msecs = min(9000, max(3500, 1800 + 32 * len(title + text)))
         self._timer.start(msecs)
 
     def _place(self) -> None:

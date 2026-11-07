@@ -1,21 +1,20 @@
 """Données factices de démonstration (remplacées plus tard par les paramètres et les services)."""
 from __future__ import annotations
 
+from app.config import ASSOCIATION_NAME, BRAND_INITIALS
 from app.ui.ports import ExerciseInfo, NotificationInfo
 
-ASSOCIATION_NAME = "Collectivité LANTCHIBLE"
-BRAND_NAME = "Collectivité LANTCHIBLE"
+BRAND_NAME = ASSOCIATION_NAME
 BRAND_SUB = "Gestion d’association"
-BRAND_INITIALS = "CL"
+ASSOCIATION_NAME = f"Association {ASSOCIATION_NAME}"
 SIDEBAR_FOOTER = "Version 1.0 · Mode hors ligne"
-LOGIN_TAGLINE = ("Cotisations, décès, amendes et bilan : tout le carnet de votre association, "
-                 "simplement et sans Internet.")
+LOGIN_TAGLINE = "Cotisations, dépenses et bilan de l’exercice, en toute transparence."
 LOGIN_FEATURES = (
-    "Cotisations mensuelles, funéraires et parallèles",
-    "Bilan financier et clôture d’exercice",
-    "Sauvegarde automatique de vos données",
+    "Fonctionne sans connexion Internet",
+    "Données enregistrées localement sur cet ordinateur",
+    "Chaque action est consignée dans le journal d’audit",
 )
-LOGIN_FOOTER = "© 2026 Association Collectivité LANTCHIBLE"
+LOGIN_FOOTER = "Version 1.0 · Windows 10 / 11"
 
 EXERCISES = (
     ExerciseInfo("2025–2026", True),
